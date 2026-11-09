@@ -246,7 +246,7 @@ $('#startBtn').addEventListener('click', async () => {
     log: ['Démarrage : ' + queue.length + ' lien(s)']
   };
   await chrome.storage.local.set({ [KEY]: state });
-  chrome.runtime.sendMessage({ type: 'ensureLinkfireTab' });
+  chrome.runtime.sendMessage({ type: 'ensureLinkfireTab', reload: true });
 });
 
 $('#stopBtn').addEventListener('click', async () => {
