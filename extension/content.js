@@ -509,43 +509,46 @@
         return b ? [...b.container.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio])')]
           .filter(visible).filter(i => !i.closest('[class*="select" i]') && i.getAttribute('role') !== 'combobox' && i.getAttribute('aria-autocomplete') !== 'list') : [];
       };
+      // « UPC » affiché seul (étiquette à gauche de la case, ou option choisie)
       const isUpcChosen = () => {
         const b = fieldBlock(/^scan using$/i);
         if (!b) return false;
         const sel = b.container.querySelector('select');
-        if (sel) return /\bupc\b/i.test(sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '');
-        return /\bupc\b/i.test((b.container.innerText || '').replace(/scan using/i, ''));
+        if (sel && sel.options[sel.selectedIndex] && /^\s*upc\s*$/i.test(sel.options[sel.selectedIndex].textContent)) return true;
+        return [...b.container.querySelectorAll('*')].some(e => !e.childElementCount && /^upc$/i.test(ownText(e)));
       };
-      if (!isUpcChosen()) {
+      // 1) Cas Linkfire : une seule case, on tape le code et l'étiquette « None » devient « UPC » toute seule
+      const direct = plainInputs().pop();
+      if (direct && !isUpcChosen()) {
+        realClick(direct);
+        setNativeValue(direct, job.upc);
+        direct.dispatchEvent(new Event('blur', { bubbles: true }));
+        await waitFor(() => isUpcChosen(), 4000);
+      }
+      // 2) Sinon : vraie liste à choisir (ancienne méthode)
+      if (!isUpcChosen() && !(direct && direct.value.replace(/\D/g, '') === job.upc)) {
         const sel = sb.container.querySelector('select');
         const tries = [];
         if (sel) tries.push(() => chooseFromDropdown(sel, /^upc$/i));
-        // liste maison : on clique sur la valeur affichée (« None ») puis sur « UPC »
         const noneEl = findByText(/^none$/i, sb.container)[0];
         if (noneEl) tries.push(() => chooseFromDropdown(clickable(noneEl), /^upc$/i));
-        const trig = sb.control || sb.container.querySelector('[role=combobox], [class*="select" i], [class*="control" i], button');
-        if (trig) tries.push(() => chooseFromDropdown(trig, /^upc$/i));
-        // dernier recours : clavier (taper « UPC » puis Entrée)
-        if (trig) tries.push(async () => {
-          realClick(trig); await sleep(300);
-          const ae = document.activeElement;
-          if (ae && ae.tagName === 'INPUT') { setNativeValue(ae, 'UPC'); await sleep(400); pressKey(ae, 'Enter'); }
-          return true;
-        });
         for (const t of tries) {
           try { await t(); } catch (e) { /* essai suivant */ }
           if (await waitFor(() => isUpcChosen(), 2500)) break;
         }
         await closeMenus();
-        if (!isUpcChosen()) fail('Je n’arrive pas à mettre « UPC » dans « Scan using ». Choisis UPC à la main, tape l’UPC, puis « Réessayer ».');
       }
       const upcInput = await waitFor(() => plainInputs().pop(), 5000);
-      if (!upcInput) fail('« UPC » est bien choisi mais je ne trouve pas la case où taper le code. Tape-le à la main puis « Réessayer ».');
+      if (!upcInput) fail('Je ne trouve pas la case de « Scan using » où taper l’UPC. Tape-le à la main puis « Réessayer ».');
       if (upcInput.value.replace(/\D/g, '') !== job.upc) {
         setNativeValue(upcInput, job.upc);
         upcInput.dispatchEvent(new Event('blur', { bubbles: true }));
       }
-      await sleep(400);
+      await sleep(600);
+      // message rouge éventuel (« not a valid UPC… »)
+      const sbErr = fieldBlock(/^scan using$/i);
+      const bad = sbErr && (sbErr.container.innerText || '').split('\n').find(t => /not (a )?valid|invalid/i.test(t));
+      if (bad) fail(`Linkfire refuse l’UPC ${job.upc} : « ${bad.trim()} ». Vérifie le code, corrige-le à la main puis « Réessayer ».`);
 
       // Case "Schedule rescan"
       const cbs = [...document.querySelectorAll('input[type=checkbox], [role=checkbox]')];
