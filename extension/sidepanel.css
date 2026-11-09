@@ -51,3 +51,5 @@ details{margin-top:8px}
 .linkrow input[data-f=subdomain]{flex:1.2}
 .linkrow input[data-f=slug]{flex:1}
 .dom{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--ink);white-space:nowrap}
+.rws{border-color:#bfdbfe;background:#f8fbff}
+.rws .primary{margin-bottom:0}

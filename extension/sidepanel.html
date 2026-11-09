@@ -11,8 +11,16 @@
     <p class="sub">Une ligne = un lien. L’extension remplit Linkfire à ta place.</p>
   </header>
 
+  <section class="card rws">
+    <h2>Depuis RWS</h2>
+    <p class="hint">Ouvre la page d’une sortie sur RWS (apps.rws.umusic.net/releases/…), puis :</p>
+    <button id="scanOne" class="primary">📥 Scanner l’onglet RWS ouvert</button>
+    <button id="scanAll" class="ghost" style="width:100%">Scanner tous les onglets RWS ouverts</button>
+    <span id="scanMsg" class="msg"></span>
+  </section>
+
   <section class="card">
-    <h2>1. Importer tes sorties <small>(optionnel)</small></h2>
+    <h2>1. Ou importer tes sorties <small>(Excel, copier-coller)</small></h2>
     <p class="hint">Colonnes : <b>Artiste(s)</b> · <b>Titre</b> · <b>UPC</b> · <b>Date de sortie</b> (JJ/MM/AAAA)</p>
     <label class="filebtn">📄 Importer un fichier Excel ou CSV<input type="file" id="xlsFile" accept=".xlsx,.xls,.csv"></label>
     <p class="hint" style="margin-top:8px">… ou colle les lignes copiées depuis Excel / Sheets :</p>
@@ -58,6 +66,7 @@
   </section>
 
   <script src="xlsx.full.min.js"></script>
+  <script src="rws.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

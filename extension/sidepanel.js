@@ -12,8 +12,11 @@ function splitArtists(t) {
 
 function cap(word) { return word ? word[0].toUpperCase() + word.slice(1) : ''; }
 
+// lettres que la décomposition Unicode ne simplifie pas (ø de døpelym, etc.)
+const TRANSLIT = { 'ø': 'o', 'Ø': 'O', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE', 'ß': 'ss', 'đ': 'd', 'Đ': 'D', 'ł': 'l', 'Ł': 'L', 'þ': 'th', 'ð': 'd', '$': 's', '&': 'x' };
 function slugPart(t) {
   return (t || '')
+    .replace(/[øØæÆœŒßđĐłŁþð$]/g, c => TRANSLIT[c])
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/['’`]/g, '')
     .replace(/[^A-Za-z0-9]+/g, ' ')
@@ -348,3 +351,51 @@ chrome.storage.onChanged.addListener((ch, area) => {
   renderRows();
   renderState(d[KEY]);
 })();
+
+// ---------- Scan RWS ----------
+function scanMsg(t, ok) {
+  const el = $('#scanMsg');
+  el.style.color = ok ? '#059669' : '';
+  el.textContent = t;
+}
+
+async function scanTabs(tabs) {
+  const recs = [], problems = [];
+  for (const tab of tabs) {
+    try {
+      const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: lfaScanRwsPage });
+      const d = res && res.result;
+      if (d && d.ok) recs.push({ artists: d.artists, title: d.title, upc: d.upc, date: d.date });
+      else problems.push((d && d.upc) || tab.title || 'onglet');
+    } catch (e) {
+      problems.push(tab.title || 'onglet');
+    }
+  }
+  // pas de doublon : on saute les UPC déjà dans la liste
+  const known = new Set(rows.map(r => (r.upc || '').trim()));
+  const fresh = recs.filter(r => !known.has(r.upc));
+  const added = addRecords(fresh);
+  let msg = added ? `${added} sortie(s) ajoutée(s) depuis RWS. Vérifie-les puis « Lancer la création ».` : '';
+  if (recs.length > fresh.length) msg += ` ${recs.length - fresh.length} déjà dans la liste.`;
+  if (problems.length) msg += ` Lecture impossible : ${problems.join(', ')} (recharge la page RWS et réessaie).`;
+  scanMsg(msg.trim() || 'Rien à ajouter.', added > 0 && !problems.length);
+  if (added) document.querySelector('#rows').scrollIntoView({ behavior: 'smooth' });
+}
+
+const RWS_URL = 'https://apps.rws.umusic.net/releases/*';
+
+$('#scanOne').addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (!tab || !/^https:\/\/apps\.rws\.umusic\.net\/releases\//.test(tab.url || '')) {
+    const any = await chrome.tabs.query({ url: RWS_URL });
+    if (any.length === 1) return scanTabs(any);
+    return scanMsg('Ouvre d’abord la page d’une sortie sur RWS (apps.rws.umusic.net/releases/…), puis clique à nouveau.');
+  }
+  scanTabs([tab]);
+});
+
+$('#scanAll').addEventListener('click', async () => {
+  const tabs = await chrome.tabs.query({ url: RWS_URL });
+  if (!tabs.length) return scanMsg('Aucun onglet de sortie RWS ouvert.');
+  scanTabs(tabs);
+});
