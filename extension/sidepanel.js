@@ -20,12 +20,27 @@ function slugPart(t) {
     .trim().split(/\s+/).filter(Boolean).map(cap).join('_');
 }
 
-function makeSlug(artists, title, format) {
-  const t = slugPart(title);
-  if (format === 'title') return t;
-  // Artistes collés et reliés par « x » : THB + OG Mahilet → THBxOGMahilet
-  const a = splitArtists(artists).map(n => slugPart(n).replace(/_/g, '')).join('x');
-  return a ? a + '_' + t : t;
+// Sous-domaine : artistes collés et reliés par « x » → THBxOGMahilet
+function makeSubdomain(artists) {
+  return splitArtists(artists).map(n => slugPart(n).replace(/_/g, '')).join('x');
+}
+
+// Fin du lien : le titre seul, en minuscules → die, pourquoi_tu_mas_blesse
+// Linkfire exige au moins 3 caractères : un titre court (« Go ») devient go_artiste
+function makeSlug(title, artists) {
+  let s = slugPart(title).toLowerCase();
+  if (s.length < 3) {
+    const a = splitArtists(artists || '').map(n => slugPart(n).replace(/_/g, '').toLowerCase())[0] || 'link';
+    s = s ? s + '_' + a : a;
+  }
+  while (s.length < 3) s += '_';
+  return s;
+}
+
+// Remplit automatiquement ce qui n'a pas été modifié à la main
+function autoFill(r) {
+  if (!slugTouched[r.id + ':sub']) r.subdomain = makeSubdomain(r.artists);
+  if (!slugTouched[r.id]) r.slug = makeSlug(r.title, r.artists);
 }
 
 function parseDate(t) {
@@ -41,12 +56,11 @@ function parseDate(t) {
 }
 
 function newRow(v = {}) {
-  return { id: Math.random().toString(36).slice(2), artists: '', title: '', upc: '', date: '', slug: '', cover: '', coverName: '', ...v };
+  return { id: Math.random().toString(36).slice(2), artists: '', title: '', upc: '', date: '', subdomain: '', slug: '', cover: '', coverName: '', ...v };
 }
 
 const settings = () => ({
   mode: document.querySelector('input[name=mode]:checked').value,
-  slugFormat: $('#slugFormat').value,
   time: $('#time').value,
   tagArtist: false
 });
@@ -70,7 +84,7 @@ function renderRows() {
         <label class="full">Titre<input data-f="title" value=""></label>
         <label>UPC<input data-f="upc" inputmode="numeric" value=""></label>
         <label>Date de sortie<input data-f="date" type="date" value=""></label>
-        <label class="full">Fin du lien<input data-f="slug" class="slug" value=""></label>
+        <label class="full">Lien<span class="linkrow"><input data-f="subdomain" class="slug" value=""><span class="dom">.lnk.to/</span><input data-f="slug" class="slug" value=""></span></label>
       </div>
       <div class="cover">
         ${r.cover ? `<img src="${r.cover}">` : ''}
@@ -83,9 +97,11 @@ function renderRows() {
       inp.addEventListener('input', () => {
         r[f] = inp.value;
         if (f === 'slug') slugTouched[r.id] = true;
-        if ((f === 'artists' || f === 'title') && !slugTouched[r.id]) {
-          r.slug = makeSlug(r.artists, r.title, $('#slugFormat').value);
+        if (f === 'subdomain') slugTouched[r.id + ':sub'] = true;
+        if (f === 'artists' || f === 'title') {
+          autoFill(r);
           el.querySelector('input[data-f=slug]').value = r.slug;
+          el.querySelector('input[data-f=subdomain]').value = r.subdomain;
         }
         saveDraft();
       });
@@ -110,7 +126,7 @@ function addRecords(recs) {
   for (const c of recs) {
     if (!c.artists && !c.title) continue;
     const r = newRow({ artists: c.artists || '', title: c.title || '', upc: (c.upc || '').replace(/\D/g, ''), date: c.date || '' });
-    r.slug = makeSlug(r.artists, r.title, $('#slugFormat').value);
+    autoFill(r);
     if (rows.length === 1 && !rows[0].artists && !rows[0].title) rows = []; // remplacer la ligne vide de départ
     rows.push(r);
     added++;
@@ -200,10 +216,6 @@ $('#xlsFile').addEventListener('change', async (e) => {
 
 $('#addRow').addEventListener('click', () => { rows.push(newRow()); saveDraft(); renderRows(); });
 
-$('#slugFormat').addEventListener('change', () => {
-  rows.forEach(r => { if (!slugTouched[r.id]) r.slug = makeSlug(r.artists, r.title, $('#slugFormat').value); });
-  saveDraft(); renderRows();
-});
 document.querySelectorAll('input[name=mode], #time').forEach(i => i.addEventListener('change', saveDraft));
 
 // ---------- Lancement ----------
@@ -215,7 +227,9 @@ function validate() {
     if (!r.title.trim()) errs.push(`${n} : titre manquant`);
     if (!/^\d{12,14}$/.test((r.upc || '').trim())) errs.push(`${n} : UPC invalide (12 à 14 chiffres)`);
     if (!r.date) errs.push(`${n} : date de sortie manquante`);
-    if (!r.slug.trim()) errs.push(`${n} : fin du lien vide`);
+    if (r.slug.trim().length < 3) errs.push(`${n} : fin du lien trop courte (3 caractères minimum)`);
+    if (/[^A-Za-z0-9_\-]/.test(r.slug.trim())) errs.push(`${n} : fin du lien avec caractères interdits (lettres, chiffres, _ et - seulement)`);
+    if (!(r.subdomain || '').trim()) errs.push(`${n} : sous-domaine vide`);
   });
   if (!rows.length) errs.push('Ajoute au moins une sortie.');
   return errs;
@@ -235,6 +249,7 @@ $('#startBtn').addEventListener('click', async () => {
     upc: r.upc.trim(),
     date: r.date,
     time: st.time || '',
+    subdomain: (r.subdomain || '').trim(),
     slug: r.slug.trim(),
     tags: [],
     cover: r.cover || '',
@@ -325,12 +340,11 @@ chrome.storage.onChanged.addListener((ch, area) => {
     slugTouched = draft.slugTouched || {};
     const st = draft.settings || {};
     if (st.mode) document.querySelector(`input[name=mode][value=${st.mode}]`).checked = true;
-    if (st.slugFormat) $('#slugFormat').value = st.slugFormat;
     if (st.time) $('#time').value = st.time;
   }
   if (!rows.length) rows = [newRow()];
   // recalculer les fins de lien non modifiées à la main (nouveau format)
-  rows.forEach(r => { if (!slugTouched[r.id]) r.slug = makeSlug(r.artists, r.title, $('#slugFormat').value); });
+  rows.forEach(autoFill);
   renderRows();
   renderState(d[KEY]);
 })();

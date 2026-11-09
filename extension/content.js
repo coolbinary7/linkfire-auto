@@ -8,14 +8,15 @@
 
   const KEY = 'lfa';
   const STEPS = [
-    'start', 'chooseType', 'fillSetup', 'fillLink', 'createDraft',
+    'start', 'chooseType', 'fillSetup', 'fillDomain', 'fillSlug', 'createDraft',
     'openRescan', 'fillRescan', 'scheduleRescan', 'publish', 'collect'
   ];
   const STEP_LABELS = {
     start: 'Ouvrir « Create link »',
     chooseType: 'Choisir « Pre-release »',
     fillSetup: 'Remplir cover, titre et artiste',
-    fillLink: 'Remplir le lien (domaine + fin du lien)',
+    fillDomain: 'Choisir le sous-domaine (Artiste1xArtiste2.lnk.to)',
+    fillSlug: 'Remplir la fin du lien',
     createDraft: 'Cliquer « Create draft »',
     openRescan: 'Ouvrir « Rescan link »',
     fillRescan: 'Mettre l’UPC et la date de sortie',
@@ -405,38 +406,70 @@
       if (warnings.length) await log('⚠️ ' + job.title + ' : ' + warnings.join(', '));
     },
 
-    async fillLink(job) {
-      const warnings = [];
+    async fillDomain(job) {
       if (!onSetupScreen()) fail('Je ne suis plus sur l’écran « Setup your pre-release link ». S’il reste un brouillon vide « Untitled link », supprime-le, puis « Arrêter » et relance.');
-      // Lien : domaine + fin d'URL
+      if (!job.subdomain) return;
+      const key = (t) => norm(t).replace(/ /g, '').replace(/lnkto$/, '');
+      const want = key(job.subdomain);
+      const manual = `Sous-domaine « ${job.subdomain}.lnk.to » : choisis-le ou crée-le à la main dans « Link », puis « C’est fait à la main → suite ».`;
       const lb = fieldBlock(/^link$/i);
       if (!lb) fail('Champ « Link » introuvable.');
-      const linkInputs = (lb.inputs || [lb.input]).filter(i => i.tagName !== 'SELECT');
-      // domaine : on tente de choisir celui de l'artiste (ex. Miedjia.lnk.to)
-      try {
-        const domainTrigger = lb.container.querySelector('select, [role=combobox], [class*="select" i], [class*="control" i]');
-        if (domainTrigger && job.artists[0]) {
-          const want = norm(job.artists[0]).replace(/ /g, '');
-          const before = ownText(domainTrigger);
-          if (!norm(before).replace(/ /g, '').includes(want)) {
-            const re = new RegExp('^' + want.split('').join('[^a-z0-9]*') + '[^a-z0-9]*\\.?lnk\\.to', 'i');
-            const okDomain = await chooseFromDropdown(domainTrigger, { test: (t) => re.test(norm(t).replace(/ /g, '').replace('lnkto', '.lnk.to')) || norm(t).replace(/ /g, '').startsWith(want + 'lnk') });
-            if (!okDomain) { await closeMenus(); warnings.push('domaine de l’artiste absent, domaine par défaut gardé'); }
-          }
-        }
-      } catch (e) { warnings.push('domaine non modifié'); }
-      await sleep(300);
+      const isPlain = (i) => i.tagName === 'INPUT' && !i.closest('[class*="select" i]') && i.getAttribute('role') !== 'combobox';
+      // Cas 1 : le sous-domaine est une simple case à remplir
+      if (lb.inputs && lb.inputs.length >= 2 && isPlain(lb.inputs[0]) && visible(lb.inputs[0])) {
+        setNativeValue(lb.inputs[0], job.subdomain);
+        lb.inputs[0].dispatchEvent(new Event('blur', { bubbles: true }));
+        await sleep(800);
+        return;
+      }
+      const control = lb.control || lb.container.querySelector('select, [role=combobox], [class*="select" i], [class*="control" i]');
+      if (!control) fail(manual);
+      if (key(ownText(control)).startsWith(want)) return; // déjà le bon
+      // Cas 2 : vraie liste <select>
+      if (control.tagName === 'SELECT') {
+        const o = [...control.options].find(op => key(op.textContent) === want);
+        if (!o) fail(manual);
+        control.value = o.value;
+        control.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      // Cas 3 : liste déroulante (avec ou sans recherche)
+      realClick(control);
+      await sleep(400);
+      const ae = document.activeElement;
+      if (ae && ae.tagName === 'INPUT' && lb.container.contains(ae) && !isPlain(ae) || (ae && ae.tagName === 'INPUT' && ae.closest('[class*="select" i]'))) {
+        setNativeValue(ae, job.subdomain);
+      }
+      const opt = await waitFor(() => {
+        const opts = visibleOptions();
+        return opts.find(o => key(ownText(o)) === want)
+          || opts.find(o => /create|add|cr[eé]er|ajouter|use/i.test(ownText(o)) && key(ownText(o)).includes(want));
+      }, 6000);
+      if (!opt) { await closeMenus(); fail(manual); }
+      realClick(opt);
+      await sleep(600);
+      await closeMenus();
       const lb2 = fieldBlock(/^link$/i);
-      const slugInput = [...lb2.container.querySelectorAll('input:not([type=hidden]):not([role=combobox])')]
-        .filter(visible).filter(i => !i.closest('[class*="select" i]')).pop() || linkInputs.pop();
-      if (!slugInput) fail('Champ de fin de lien introuvable.');
+      if (!lb2 || !key(lb2.container.innerText || '').includes(want)) fail(manual);
+    },
+
+    async fillSlug(job) {
+      if (!onSetupScreen()) fail('Je ne suis plus sur l’écran « Setup your pre-release link ». S’il reste un brouillon vide « Untitled link », supprime-le, puis « Arrêter » et relance.');
+      const lb = fieldBlock(/^link$/i);
+      if (!lb) fail('Champ « Link » introuvable.');
+      const slugInput = [...lb.container.querySelectorAll('input:not([type=hidden]):not([role=combobox])')]
+        .filter(visible).filter(i => !i.closest('[class*="select" i]')).pop();
+      if (!slugInput) fail('Case de fin de lien introuvable.');
       setNativeValue(slugInput, job.slug);
       slugInput.dispatchEvent(new Event('blur', { bubbles: true }));
       await sleep(1500);
-      if (/not available|unavailable|already (in use|taken|exists)|is taken/i.test(lb2.container.innerText || '')) {
-        fail(`Le lien « ${job.slug} » est déjà pris. Change la fin du lien à la main, puis « Continuer ».`);
+      // message rouge de Linkfire sous le lien (trop court, déjà pris, caractères interdits…)
+      const errLine = (lb.container.innerText || '').split('\n').map(t => t.trim())
+        .find(t => /too short|too long|minimum|maximum|invalid|not allowed|not available|unavailable|already|is taken|required/i.test(t) && !/is available/i.test(t));
+      if (errLine) fail(`Linkfire refuse la fin du lien « ${job.slug} » : « ${errLine} ». Corrige-la à la main, puis « C’est fait à la main → suite ».`);
+      if (/not available|unavailable|already (in use|taken|exists)|is taken/i.test(lb.container.innerText || '')) {
+        fail(`Le lien « ${job.subdomain ? job.subdomain + '.lnk.to/' : ''}${job.slug} » est déjà pris. Change la fin du lien à la main, puis « C’est fait à la main → suite ».`);
       }
-      if (warnings.length) await log('⚠️ ' + job.title + ' : ' + warnings.join(', '));
     },
 
     async createDraft() {

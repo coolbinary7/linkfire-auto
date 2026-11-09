@@ -45,3 +45,9 @@ button.danger{color:var(--red)}
 .b.todo{background:#9ca3af}.b.running{background:var(--blue)}.b.done{background:var(--green)}.b.error{background:var(--red)}.b.skipped{background:var(--orange)}
 pre{white-space:pre-wrap;font-size:11px;max-height:200px;overflow:auto;background:#f9fafb;padding:6px;border-radius:6px}
 details{margin-top:8px}
+
+.linkrow{display:flex;align-items:center;gap:4px;margin-top:2px}
+.linkrow input{margin-top:0}
+.linkrow input[data-f=subdomain]{flex:1.2}
+.linkrow input[data-f=slug]{flex:1}
+.dom{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--ink);white-space:nowrap}
