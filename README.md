@@ -5,7 +5,7 @@ Extension Chrome qui crée des liens **pre-save Linkfire** en série.
 Tu fournis, pour chaque sortie, l’artiste ou les artistes, le titre, l’UPC, la date de sortie et une cover si tu en as une. Tu peux les saisir à la main ou importer un fichier Excel/CSV. L’extension :
 
 1. clique sur *Create link* puis choisit *Pre-release* ;
-2. remplit la cover, le titre, l’artiste, les tags et le lien (domaine de l’artiste + `Artiste_Titre`) ;
+2. remplit la cover, le titre, l’artiste, et le lien (domaine de l’artiste + `Artiste_Titre`) ;
 3. clique sur *Create draft* ;
 4. dans *Rescan link*, choisit *UPC*, saisit le code, coche *Schedule rescan* et met la date de sortie ;
 5. publie, puis récupère le lien.

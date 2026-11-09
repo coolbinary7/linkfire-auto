@@ -8,13 +8,14 @@
 
   const KEY = 'lfa';
   const STEPS = [
-    'start', 'chooseType', 'fillSetup', 'createDraft',
+    'start', 'chooseType', 'fillSetup', 'fillLink', 'createDraft',
     'openRescan', 'fillRescan', 'scheduleRescan', 'publish', 'collect'
   ];
   const STEP_LABELS = {
     start: 'Ouvrir « Create link »',
     chooseType: 'Choisir « Pre-release »',
-    fillSetup: 'Remplir cover, titre, artiste, tags, lien',
+    fillSetup: 'Remplir cover, titre et artiste',
+    fillLink: 'Remplir le lien (domaine + fin du lien)',
     createDraft: 'Cliquer « Create draft »',
     openRescan: 'Ouvrir « Rescan link »',
     fillRescan: 'Mettre l’UPC et la date de sortie',
@@ -140,29 +141,62 @@
 
   const INPUTS = 'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]), textarea, [contenteditable=true], select';
 
+  // Libellés de champs connus : sert à ne jamais déborder sur le champ d'à côté
+  const FIELD_LABELS = /^(title|artists?|tags?|link|scan using|date|time|service to rescan)(\s|\*|ⓘ|\?|$)/i;
+
+  // Champ "présent" : visible, ou caché mais dans un bloc visible (ex. listes à recherche)
+  function present(el) {
+    return visible(el) || (el.parentElement && visible(el.parentElement));
+  }
+
+  // Le libellé de champ connu qui précède directement un élément dans la page
+  function ownerLabel(el, labels) {
+    let owner = null;
+    for (const l of labels) {
+      if (l.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) owner = l; else break;
+    }
+    return owner;
+  }
+
   // Trouve le bloc (label + champ) correspondant à un libellé, ex. "Title"
   function fieldBlock(labelRe, root = document) {
     const labels = findByText(labelRe, root).filter(l => !l.matches('button, a'));
+    const allLabels = findByText(FIELD_LABELS).filter(l => !l.matches('button, a, option, [role=option]'));
     for (const lab of labels) {
-      // label avec for=
       if (lab.tagName === 'LABEL' && lab.htmlFor) {
         const t = document.getElementById(lab.htmlFor);
-        if (t) return { label: lab, container: t.parentElement, input: t };
+        if (t) return { label: lab, container: t.parentElement, input: t, inputs: [t] };
       }
-      // remonter jusqu'à un ancêtre qui contient un champ
       let node = lab;
       for (let i = 0; i < 5 && node; i++) {
         node = node.parentElement;
         if (!node) break;
-        const inputs = [...node.querySelectorAll(INPUTS)].filter(visible);
-        if (inputs.length) {
-          // le premier champ situé APRÈS le libellé dans le document
-          const after = inputs.find(inp => lab.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
-          return { label: lab, container: node, input: after || inputs[0], inputs };
+        // seulement les champs qui appartiennent à CE libellé (pas au suivant)
+        const inputs = [...node.querySelectorAll(INPUTS)].filter(present)
+          .filter(inp => (lab.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING))
+          .filter(inp => { const o = ownerLabel(inp, allLabels); return !o || o === lab || lab.contains(o) || o.contains(lab); });
+        const control = [...node.querySelectorAll('[role=combobox], [class*="control" i], [class*="select" i], [class*="placeholder" i]')]
+          .filter(visible)
+          .find(c => (lab.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) && (() => { const o = ownerLabel(c, allLabels); return !o || o === lab || lab.contains(o) || o.contains(lab); })());
+        if (inputs.length || control) {
+          return { label: lab, container: node, input: inputs[0] || null, inputs, control };
         }
       }
     }
     return null;
+  }
+
+  // Ouvre une liste à recherche (ex. "Select an artist") et renvoie la case où taper
+  async function openCombobox(block) {
+    const target = block.control || block.input;
+    if (!target) return null;
+    realClick(target);
+    await sleep(300);
+    const ae = document.activeElement;
+    if (ae && ae.tagName === 'INPUT' && block.container.contains(ae)) return ae;
+    const inp = block.container.querySelector('input:not([type=hidden]):not([type=checkbox])');
+    if (inp) { inp.focus(); return inp; }
+    return ae && ae.tagName === 'INPUT' ? ae : null;
   }
 
   function visibleOptions() {
@@ -179,9 +213,9 @@
   }
 
   // Tape dans une liste déroulante "avec recherche" et choisit la bonne option
-  async function selectInCombobox(input, wanted, { allowCreate = true, timeout = 8000 } = {}) {
-    realClick(input);
-    await sleep(150);
+  async function selectInCombobox(input, wanted, { allowCreate = false, timeout = 8000 } = {}) {
+    input.focus();
+    await sleep(100);
     setNativeValue(input, wanted);
     let opt = await waitFor(() => pickOption(visibleOptions(), wanted), timeout);
     if (!opt && allowCreate) {
@@ -334,32 +368,25 @@
       await sleep(200);
 
       // 3. Artiste(s)
-      const artistBlock = fieldBlock(/^artists?\s*\*?$/i);
-      if (!artistBlock) fail('Champ « Artist » introuvable.');
       for (const a of job.artists) {
-        const inp = fieldBlock(/^artists?\s*\*?$/i).input;
+        const blk = fieldBlock(/^artists?\s*\*?$/i);
+        if (!blk) fail('Champ « Artist » introuvable.');
+        const inp = await openCombobox(blk);
+        if (!inp) fail('Je n’arrive pas à ouvrir la liste « Artist ». Choisis l’artiste à la main, puis « Continuer ».');
         const ok = await selectInCombobox(inp, a);
-        if (!ok) fail(`Artiste « ${a} » introuvable dans la liste Linkfire. Choisis-le à la main, puis « Continuer ».`);
+        if (!ok) {
+          pressKey(inp, 'Escape');
+          setNativeValue(inp, '');
+          fail(`Artiste « ${a} » introuvable dans la liste Linkfire. Choisis-le à la main, puis « C’est fait à la main → suite ».`);
+        }
       }
       pressKey(document.activeElement || document.body, 'Escape');
+      if (warnings.length) await log('⚠️ ' + job.title + ' : ' + warnings.join(', '));
+    },
 
-      // 4. Tags (un par artiste)
-      if (job.tags && job.tags.length) {
-        for (const tag of job.tags) {
-          const tb = fieldBlock(/^tags?$/i);
-          if (!tb) { warnings.push('tags non ajoutés'); break; }
-          realClick(tb.input);
-          setNativeValue(tb.input, tag);
-          await sleep(600);
-          const opt = pickOption(visibleOptions(), tag)
-            || visibleOptions().find(o => /create|add|cr[eé]er/i.test(ownText(o)));
-          if (opt) realClick(opt); else pressKey(tb.input, 'Enter');
-          await sleep(400);
-        }
-        pressKey(document.activeElement || document.body, 'Escape');
-      }
-
-      // 5. Lien : domaine + fin d'URL
+    async fillLink(job) {
+      const warnings = [];
+      // Lien : domaine + fin d'URL
       const lb = fieldBlock(/^link$/i);
       if (!lb) fail('Champ « Link » introuvable.');
       const linkInputs = (lb.inputs || [lb.input]).filter(i => i.tagName !== 'SELECT');

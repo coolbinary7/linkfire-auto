@@ -47,7 +47,7 @@ const settings = () => ({
   mode: document.querySelector('input[name=mode]:checked').value,
   slugFormat: $('#slugFormat').value,
   time: $('#time').value,
-  tagArtist: $('#tagArtist').checked
+  tagArtist: false
 });
 
 function saveDraft() {
@@ -203,7 +203,7 @@ $('#slugFormat').addEventListener('change', () => {
   rows.forEach(r => { if (!slugTouched[r.id]) r.slug = makeSlug(r.artists, r.title, $('#slugFormat').value); });
   saveDraft(); renderRows();
 });
-document.querySelectorAll('input[name=mode], #time, #tagArtist').forEach(i => i.addEventListener('change', saveDraft));
+document.querySelectorAll('input[name=mode], #time').forEach(i => i.addEventListener('change', saveDraft));
 
 // ---------- Lancement ----------
 function validate() {
@@ -235,7 +235,7 @@ $('#startBtn').addEventListener('click', async () => {
     date: r.date,
     time: st.time || '',
     slug: r.slug.trim(),
-    tags: st.tagArtist ? splitArtists(r.artists) : [],
+    tags: [],
     cover: r.cover || '',
     coverName: r.coverName || '',
     status: 'todo', link: '', error: ''
@@ -326,7 +326,6 @@ chrome.storage.onChanged.addListener((ch, area) => {
     if (st.mode) document.querySelector(`input[name=mode][value=${st.mode}]`).checked = true;
     if (st.slugFormat) $('#slugFormat').value = st.slugFormat;
     if (st.time) $('#time').value = st.time;
-    if (st.tagArtist === false) $('#tagArtist').checked = false;
   }
   if (!rows.length) rows = [newRow()];
   renderRows();
