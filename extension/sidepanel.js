@@ -65,6 +65,7 @@ function newRow(v = {}) {
 const settings = () => ({
   mode: document.querySelector('input[name=mode]:checked').value,
   time: $('#time').value,
+  sepWin: $('#sepWin').checked,
   tagArtist: false
 });
 
@@ -219,7 +220,7 @@ $('#xlsFile').addEventListener('change', async (e) => {
 
 $('#addRow').addEventListener('click', () => { rows.push(newRow()); saveDraft(); renderRows(); });
 
-document.querySelectorAll('input[name=mode], #time').forEach(i => i.addEventListener('change', saveDraft));
+document.querySelectorAll('input[name=mode], #time, #sepWin').forEach(i => i.addEventListener('change', saveDraft));
 
 // ---------- Lancement ----------
 function validate() {
@@ -265,7 +266,7 @@ $('#startBtn').addEventListener('click', async () => {
     log: ['Démarrage : ' + queue.length + ' lien(s)']
   };
   await chrome.storage.local.set({ [KEY]: state });
-  chrome.runtime.sendMessage({ type: 'ensureLinkfireTab', reload: true });
+  chrome.runtime.sendMessage({ type: 'ensureLinkfireTab', reload: true, separateWindow: $('#sepWin').checked });
 });
 
 $('#stopBtn').addEventListener('click', async () => {
@@ -344,6 +345,7 @@ chrome.storage.onChanged.addListener((ch, area) => {
     const st = draft.settings || {};
     if (st.mode) document.querySelector(`input[name=mode][value=${st.mode}]`).checked = true;
     if (st.time) $('#time').value = st.time;
+    if (st.sepWin === false) $('#sepWin').checked = false;
   }
   if (!rows.length) rows = [newRow()];
   // recalculer les fins de lien non modifiées à la main (nouveau format)
