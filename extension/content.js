@@ -418,43 +418,52 @@
       const manual = `Sous-domaine « ${job.subdomain}.lnk.to » : choisis-le ou crée-le à la main dans « Link », puis « C’est fait à la main → suite ».`;
       const lb = fieldBlock(/^link$/i);
       if (!lb) fail('Champ « Link » introuvable.');
-      const isPlain = (i) => i.tagName === 'INPUT' && !i.closest('[class*="select" i]') && i.getAttribute('role') !== 'combobox';
-      // Cas 1 : le sous-domaine est une simple case à remplir
-      if (lb.inputs && lb.inputs.length >= 2 && isPlain(lb.inputs[0]) && visible(lb.inputs[0])) {
-        setNativeValue(lb.inputs[0], job.subdomain);
-        lb.inputs[0].dispatchEvent(new Event('blur', { bubbles: true }));
-        await sleep(800);
-        return;
-      }
+      const slugInputOf = (blk) => [...blk.container.querySelectorAll('input:not([type=hidden])')].filter(visible).pop();
       const control = lb.control || lb.container.querySelector('select, [role=combobox], [class*="select" i], [class*="control" i]');
-      if (!control) fail(manual);
-      if (key(ownText(control)).startsWith(want)) return; // déjà le bon
-      // Cas 2 : vraie liste <select>
-      if (control.tagName === 'SELECT') {
-        const o = [...control.options].find(op => key(op.textContent) === want);
-        if (!o) fail(manual);
-        control.value = o.value;
-        control.dispatchEvent(new Event('change', { bubbles: true }));
+      const isWanted = (t) => { const k = key(t); return k === want || k.startsWith(want + 'lnkto'); };
+      if (control && isWanted(ownText(control))) return; // déjà le bon
+      // vraie liste <select>
+      const nativeSel = lb.container.querySelector('select');
+      if (nativeSel) {
+        const ok = await chooseFromDropdown(nativeSel, { test: t => key(t) === want });
+        if (!ok) fail(manual);
         return;
       }
-      // Cas 3 : liste déroulante (avec ou sans recherche)
-      realClick(control);
+      // Liste « Search or add new » : on ouvre, on tape le sous-domaine, on choisit ou on crée
+      const findSearch = () => {
+        const blk = fieldBlock(/^link$/i);
+        if (!blk) return null;
+        const slugInp = slugInputOf(blk);
+        const byPh = [...blk.container.querySelectorAll('input')].find(i => /search|add new|select/i.test(i.getAttribute('placeholder') || ''));
+        if (byPh) return byPh;
+        const ae = document.activeElement;
+        if (ae && ae.tagName === 'INPUT' && blk.container.contains(ae) && ae !== slugInp) return ae;
+        return [...blk.container.querySelectorAll('input:not([type=hidden])')].find(i => i !== slugInp) || null;
+      };
+      realClick(findByText(/lnk\.to$/i, lb.container)[0] || control || lb.container);
       await sleep(400);
-      const ae = document.activeElement;
-      if (ae && ae.tagName === 'INPUT' && lb.container.contains(ae) && !isPlain(ae) || (ae && ae.tagName === 'INPUT' && ae.closest('[class*="select" i]'))) {
-        setNativeValue(ae, job.subdomain);
-      }
-      const opt = await waitFor(() => {
+      const search = await waitFor(findSearch, 3000);
+      if (!search) fail(manual);
+      search.focus();
+      setNativeValue(search, job.subdomain);
+      await sleep(800);
+      const isAdd = (t) => /create|add|cr[eé]er|ajouter|new/i.test(t);
+      let opt = await waitFor(() => {
         const opts = visibleOptions();
         return opts.find(o => key(ownText(o)) === want)
-          || opts.find(o => /create|add|cr[eé]er|ajouter|use/i.test(ownText(o)) && key(ownText(o)).includes(want));
-      }, 6000);
-      if (!opt) { await closeMenus(); fail(manual); }
-      realClick(opt);
-      await sleep(600);
+          || opts.find(o => isAdd(ownText(o)) && key(ownText(o)).includes(want))
+          || opts.find(o => key(ownText(o)).includes(want) && opts.length === 1);
+      }, 5000);
+      if (opt) realClick(opt);
+      else pressKey(search, 'Enter'); // certaines listes créent la valeur avec Entrée
+      await sleep(1200);
+      // fenêtre de confirmation éventuelle pour un nouveau sous-domaine
+      const dlg = [...document.querySelectorAll('[role=dialog], [class*="modal" i]')].find(visible);
+      if (dlg && /subdomain|domain/i.test(dlg.innerText || '')) await clickText(/^(create|add|save|confirm|ok|yes)$/i, { timeout: 3000, within: dlg });
       await closeMenus();
       const lb2 = fieldBlock(/^link$/i);
-      if (!lb2 || !key(lb2.container.innerText || '').includes(want)) fail(manual);
+      const leaves = lb2 ? [...lb2.container.querySelectorAll('*')].filter(e => !e.childElementCount).map(ownText).filter(Boolean) : [];
+      if (!leaves.some(isWanted)) fail(manual);
     },
 
     async fillSlug(job) {
