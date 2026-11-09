@@ -23,7 +23,8 @@ function slugPart(t) {
 function makeSlug(artists, title, format) {
   const t = slugPart(title);
   if (format === 'title') return t;
-  const a = splitArtists(artists).map(slugPart).join('_');
+  // Artistes collés et reliés par « x » : THB + OG Mahilet → THBxOGMahilet
+  const a = splitArtists(artists).map(n => slugPart(n).replace(/_/g, '')).join('x');
   return a ? a + '_' + t : t;
 }
 
@@ -65,7 +66,7 @@ function renderRows() {
       <div class="n">#${i + 1}</div>
       <button class="del" title="Supprimer">×</button>
       <div class="grid2">
-        <label class="full">Artiste(s) <small>(séparer par virgule)</small><input data-f="artists" value=""></label>
+        <label class="full">Artiste(s) <small>(principal en 1er, puis les feats, séparés par virgule)</small><input data-f="artists" value=""></label>
         <label class="full">Titre<input data-f="title" value=""></label>
         <label>UPC<input data-f="upc" inputmode="numeric" value=""></label>
         <label>Date de sortie<input data-f="date" type="date" value=""></label>
@@ -328,6 +329,8 @@ chrome.storage.onChanged.addListener((ch, area) => {
     if (st.time) $('#time').value = st.time;
   }
   if (!rows.length) rows = [newRow()];
+  // recalculer les fins de lien non modifiées à la main (nouveau format)
+  rows.forEach(r => { if (!slugTouched[r.id]) r.slug = makeSlug(r.artists, r.title, $('#slugFormat').value); });
   renderRows();
   renderState(d[KEY]);
 })();

@@ -139,6 +139,26 @@
     el.dispatchEvent(new KeyboardEvent('keyup', o));
   }
 
+  // Ferme une liste déroulante ouverte SANS touche Échap (Échap ferme l'écran Linkfire)
+  async function closeMenus() {
+    const ae = document.activeElement;
+    if (ae && ae.blur) ae.blur();
+    const head = findByText(/^(set ?up your pre-?release link|rescan link|choose link type)$/i)[0];
+    const target = head || document.querySelector('h1, h2, h3');
+    if (target) {
+      const r = target.getBoundingClientRect();
+      const o = { bubbles: true, cancelable: true, view: window, clientX: r.left + 2, clientY: r.top + 2 };
+      target.dispatchEvent(new MouseEvent('mousedown', o));
+      target.dispatchEvent(new MouseEvent('mouseup', o));
+    }
+    await sleep(250);
+  }
+
+  // Vérifie qu'on est toujours sur l'écran de création (sinon on s'arrête proprement)
+  function onSetupScreen() {
+    return /set ?up your pre-?release link/i.test(document.body.innerText || '');
+  }
+
   const INPUTS = 'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]), textarea, [contenteditable=true], select';
 
   // Libellés de champs connus : sert à ne jamais déborder sur le champ d'à côté
@@ -368,24 +388,26 @@
       await sleep(200);
 
       // 3. Artiste(s)
-      for (const a of job.artists) {
+      for (const a of job.artists.slice(0, 1)) { // artiste principal uniquement
         const blk = fieldBlock(/^artists?\s*\*?$/i);
         if (!blk) fail('Champ « Artist » introuvable.');
         const inp = await openCombobox(blk);
         if (!inp) fail('Je n’arrive pas à ouvrir la liste « Artist ». Choisis l’artiste à la main, puis « Continuer ».');
         const ok = await selectInCombobox(inp, a);
         if (!ok) {
-          pressKey(inp, 'Escape');
           setNativeValue(inp, '');
+          await closeMenus();
           fail(`Artiste « ${a} » introuvable dans la liste Linkfire. Choisis-le à la main, puis « C’est fait à la main → suite ».`);
         }
       }
-      pressKey(document.activeElement || document.body, 'Escape');
+      await closeMenus();
+      if (!onSetupScreen()) fail('L’écran de création s’est fermé. Supprime le brouillon vide « Untitled link » puis clique « Arrêter » et relance.');
       if (warnings.length) await log('⚠️ ' + job.title + ' : ' + warnings.join(', '));
     },
 
     async fillLink(job) {
       const warnings = [];
+      if (!onSetupScreen()) fail('Je ne suis plus sur l’écran « Setup your pre-release link ». S’il reste un brouillon vide « Untitled link », supprime-le, puis « Arrêter » et relance.');
       // Lien : domaine + fin d'URL
       const lb = fieldBlock(/^link$/i);
       if (!lb) fail('Champ « Link » introuvable.');
@@ -399,7 +421,7 @@
           if (!norm(before).replace(/ /g, '').includes(want)) {
             const re = new RegExp('^' + want.split('').join('[^a-z0-9]*') + '[^a-z0-9]*\\.?lnk\\.to', 'i');
             const okDomain = await chooseFromDropdown(domainTrigger, { test: (t) => re.test(norm(t).replace(/ /g, '').replace('lnkto', '.lnk.to')) || norm(t).replace(/ /g, '').startsWith(want + 'lnk') });
-            if (!okDomain) { pressKey(document.activeElement || document.body, 'Escape'); warnings.push('domaine de l’artiste absent, domaine par défaut gardé'); }
+            if (!okDomain) { await closeMenus(); warnings.push('domaine de l’artiste absent, domaine par défaut gardé'); }
           }
         }
       } catch (e) { warnings.push('domaine non modifié'); }
@@ -484,7 +506,7 @@
           const cur = fieldBlock(/^date$/i).input.value;
           if (looksLikeDate(cur, job.date)) { dateOk = true; break; }
         }
-        pressKey(document.activeElement || document.body, 'Escape');
+        await closeMenus();
       }
       if (!dateOk) {
         const [y, m, d] = job.date.split('-');
