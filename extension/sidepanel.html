@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Linkfire Auto</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header>
+    <h1>Linkfire Auto <span>pre-save</span></h1>
+    <p class="sub">Une ligne = un lien. L’extension remplit Linkfire à ta place.</p>
+  </header>
+
+  <section class="card">
+    <h2>1. Importer tes sorties <small>(optionnel)</small></h2>
+    <p class="hint">Colonnes : <b>Artiste(s)</b> · <b>Titre</b> · <b>UPC</b> · <b>Date de sortie</b> (JJ/MM/AAAA)</p>
+    <label class="filebtn">📄 Importer un fichier Excel ou CSV<input type="file" id="xlsFile" accept=".xlsx,.xls,.csv"></label>
+    <p class="hint" style="margin-top:8px">… ou colle les lignes copiées depuis Excel / Sheets :</p>
+    <textarea id="paste" rows="3" placeholder="Miedjia	Pourquoi tu m'as blessé	00881061909019	20/11/2026"></textarea>
+    <button id="importBtn" class="ghost">Ajouter ces lignes</button>
+  </section>
+
+  <section class="card">
+    <h2>2. Les sorties</h2>
+    <div id="rows"></div>
+    <button id="addRow" class="ghost">+ Ajouter une sortie</button>
+  </section>
+
+  <section class="card">
+    <h2>3. Réglages</h2>
+    <label class="opt"><input type="radio" name="mode" value="auto" checked> <b>Automatique</b> — enchaîne tout, s’arrête seulement en cas de souci</label>
+    <label class="opt"><input type="radio" name="mode" value="guide"> <b>Guidé</b> — attend ton « Continuer » avant chaque étape (conseillé la 1ʳᵉ fois)</label>
+    <div class="grid2">
+      <label>Fin du lien
+        <select id="slugFormat">
+          <option value="artist_title">Artiste_Titre</option>
+          <option value="title">Titre seul</option>
+        </select>
+      </label>
+      <label>Heure du rescan <small>(vide = celle de Linkfire)</small>
+        <input id="time" type="time">
+      </label>
+    </div>
+    <label class="opt"><input type="checkbox" id="tagArtist" checked> Mettre l’artiste en tag</label>
+  </section>
+
+  <div class="actions">
+    <button id="startBtn" class="primary">Lancer la création</button>
+    <span id="formMsg" class="msg"></span>
+  </div>
+
+  <section class="card" id="resultsCard">
+    <h2>Résultats</h2>
+    <div id="status" class="status">Rien en cours.</div>
+    <div id="results"></div>
+    <div class="row">
+      <button id="copyAll" class="ghost">Copier tous les liens</button>
+      <button id="csvBtn" class="ghost">Télécharger en CSV</button>
+      <button id="stopBtn" class="ghost danger">Arrêter</button>
+    </div>
+    <details>
+      <summary>Journal</summary>
+      <pre id="log"></pre>
+    </details>
+  </section>
+
+  <script src="xlsx.full.min.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f7f4">
+  <meta name="description" content="Extension Chrome qui crée les liens pre-save Linkfire en série.">
+  <title>Linkfire Auto — Téléchargement</title>
+  <style>
+    :root{--ink:#171816;--muted:#747670;--line:#e7e8e2;--paper:#f7f7f4;--white:#fff;--red:#e2453c;--blue:#2563eb}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    .topbar{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(20px,calc((100vw - 1000px)/2));background:rgba(255,255,255,.72)}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.03em;font-size:18px}
+    .brand img{width:30px;height:30px}
+    .toplink{font-size:13px;color:var(--muted);text-decoration:none}
+    main{width:min(100% - 32px,1000px);margin:0 auto}
+    .hero{padding:70px 0 44px;display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:end}
+    .eyebrow{display:flex;align-items:center;gap:9px;color:#62645e;text-transform:uppercase;letter-spacing:.14em;font-size:10px;font-weight:800}
+    .dot{height:8px;width:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px rgba(226,69,60,.12)}
+    h1{font-size:clamp(40px,6.5vw,68px);line-height:1;letter-spacing:-.07em;margin:18px 0 16px;font-weight:780}
+    .intro{color:#5e605a;font-size:17px;line-height:1.7;margin:0;max-width:540px}
+    .side{border-left:1px solid var(--line);padding-left:28px}
+    .side-label{font-size:10px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted);font-weight:800}
+    .ver{font-size:34px;font-weight:780;letter-spacing:-.06em;margin:10px 0 14px}
+    .btn{display:block;text-align:center;text-decoration:none;font-weight:700;font-size:14px;border-radius:12px;padding:13px 16px;margin-bottom:8px}
+    .btn.p{background:var(--ink);color:#fff}
+    .btn.s{background:#fff;border:1px solid var(--line);color:var(--ink)}
+    .note{color:var(--muted);font-size:12px;line-height:1.6;margin:6px 0 0}
+    h2{font-size:23px;letter-spacing:-.045em;margin:0 0 18px}
+    .card{background:var(--white);border:1px solid var(--line);border-radius:19px;padding:26px 30px;margin-bottom:16px}
+    ol{margin:0;padding-left:20px;line-height:1.8;color:#3d3f3a}
+    code{background:#f1f2ee;border-radius:6px;padding:2px 6px;font-size:13px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+    .step{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
+    .step b{display:block;margin-bottom:6px}
+    .step p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
+    ul{margin:0;padding-left:20px;line-height:1.8;color:#3d3f3a}
+    footer{color:var(--muted);font-size:12px;padding:30px 0 60px}
+    @media(max-width:760px){.hero{grid-template-columns:1fr;padding-top:40px}.side{border-left:0;padding-left:0}.grid{grid-template-columns:1fr}.card{padding:20px}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="./icon.png" alt="">Linkfire Auto</div>
+    <a class="toplink" href="https://github.com/coolbinary7/linkfire-auto">Code source</a>
+  </header>
+  <main>
+    <section class="hero">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>Extension Chrome · Pre-save</div>
+        <h1>Tes liens pre-save Linkfire, en série.</h1>
+        <p class="intro">Tu donnes l’artiste, le titre, l’UPC et la date de sortie (ou un fichier Excel avec plusieurs sorties). L’extension crée chaque lien dans Linkfire, programme le rescan à la date de sortie, publie, puis te rend tous les liens à copier.</p>
+      </div>
+      <aside class="side">
+        <div class="side-label">Version actuelle</div>
+        <div class="ver">1.1.0</div>
+        <a class="btn p" href="./downloads/Linkfire-Auto-1.1.0.zip">Télécharger l’extension</a>
+        <a class="btn s" href="./downloads/modele-sorties-linkfire.xlsx">Modèle Excel des sorties</a>
+        <p class="note">À installer sur un ordinateur où Linkfire est déjà accessible et connecté dans Chrome.</p>
+      </aside>
+    </section>
+
+    <h2>Installation (une seule fois)</h2>
+    <div class="card">
+      <ol>
+        <li>Télécharge le zip et <b>dézippe-le</b> : tu obtiens un dossier <code>linkfire-auto</code>. Range-le à un endroit où il ne bougera pas.</li>
+        <li>Dans Chrome, ouvre <code>chrome://extensions</code>.</li>
+        <li>Active <b>Mode développeur</b> (en haut à droite).</li>
+        <li>Clique sur <b>Charger l’extension non empaquetée</b> et choisis le dossier <code>linkfire-auto</code>.</li>
+        <li>Épingle l’extension (icône puzzle 🧩), puis clique dessus : le panneau s’ouvre sur le côté.</li>
+      </ol>
+      <p class="note">Si « Mode développeur » est grisé, l’ordinateur bloque les extensions : demande à l’IT de l’autoriser.</p>
+    </div>
+
+    <h2>Utilisation</h2>
+    <div class="grid">
+      <div class="step"><b>1. Importer</b><p>Importe le modèle Excel rempli, colle des lignes copiées depuis Sheets, ou remplis les sorties à la main.</p></div>
+      <div class="step"><b>2. Vérifier</b><p>Contrôle la fin de lien proposée (<code>Artiste_Titre</code>). Tu peux la modifier.</p></div>
+      <div class="step"><b>3. Lancer</b><p>Garde Linkfire connecté dans un onglet. Laisse tourner, puis copie tous les liens ou exporte-les en CSV.</p></div>
+    </div>
+    <div class="card">
+      <ul>
+        <li><b>Mode Guidé</b> : l’extension attend ton « Continuer » avant chaque étape. Conseillé pour un premier essai.</li>
+        <li>En cas de blocage, un bandeau en bas à gauche de Linkfire explique quoi faire : <b>Réessayer</b>, faire l’étape à la main puis continuer, ou <b>Passer ce titre</b>.</li>
+        <li>Le bouton <b>Copier le diagnostic</b> copie l’état de la page pour signaler un problème.</li>
+        <li>Les zéros au début des UPC sont gardés, même si Excel les a enlevés.</li>
+      </ul>
+    </div>
+
+    <h2>Mise à jour</h2>
+    <div class="card">
+      <ol>
+        <li>Télécharge la nouvelle version et remplace l’ancien dossier <code>linkfire-auto</code> par le nouveau.</li>
+        <li>Dans <code>chrome://extensions</code>, clique sur la flèche ↻ de Linkfire Auto.</li>
+      </ol>
+    </div>
+
+    <footer>Outil interne non officiel, non affilié à Linkfire.</footer>
+  </main>
+</body>
+</html>
