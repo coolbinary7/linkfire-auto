@@ -38,6 +38,12 @@
     ul{margin:0;padding-left:20px;line-height:1.8;color:#3d3f3a}
     footer{color:var(--muted);font-size:12px;padding:30px 0 60px}
     @media(max-width:760px){.hero{grid-template-columns:1fr;padding-top:40px}.side{border-left:0;padding-left:0}.grid{grid-template-columns:1fr}.card{padding:20px}}
+    .tuto{background:var(--white,#fff);border:1px solid var(--line);border-radius:19px;padding:14px;margin:0 0 16px}
+    .tuto video{display:block;width:100%;aspect-ratio:16/9;border-radius:12px;background:#12151b}
+    .chaps{display:flex;flex-wrap:wrap;gap:8px;padding:12px 4px 2px}
+    .chaps button{font:600 13px Inter,system-ui,sans-serif;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:99px;padding:7px 13px;cursor:pointer}
+    .chaps button:hover{border-color:var(--accent)}.chaps span{color:var(--muted);font-weight:500;margin-left:5px}
+    .chaps .dl{margin-left:auto;font-size:13px;color:var(--muted);align-self:center;text-decoration:none}
   </style>
 </head>
 <body>
@@ -56,9 +62,17 @@
         <div class="ver">1.6.0</div>
         <a class="btn p" href="./downloads/Linkfire-Auto-1.6.0.zip">Télécharger l’extension</a>
         <a class="btn s" href="./downloads/modele-sorties-linkfire.xlsx">Modèle Excel des sorties</a>
+        <a class="btn" style="background:#fff;border:1px solid var(--line);color:var(--ink)" href="#tuto">▶ Voir le tuto vidéo (1 min)</a>
         <p class="note">À installer sur un ordinateur où Linkfire est déjà accessible et connecté dans Chrome.</p>
       </aside>
     </section>
+
+    <h2 id="tuto">Tuto vidéo</h2>
+    <div class="tuto">
+      <video id="tutoVid" controls preload="metadata" playsinline poster="./videos/tuto-linkfire-auto.jpg" aria-label="Tutoriel vidéo Linkfire Auto"><source src="./videos/tuto-linkfire-auto.mp4" type="video/mp4"></video>
+      <div class="chaps"><button data-t="4">Installer<span>0:04</span></button><button data-t="14">Scanner RWS<span>0:14</span></button><button data-t="29">Lancer la création<span>0:29</span></button><button data-t="46">À retenir<span>0:46</span></button><a class="dl" href="./videos/tuto-linkfire-auto.mp4" download>Télécharger la vidéo</a></div>
+    </div>
+    <script>document.querySelectorAll('.chaps button').forEach(b=>b.addEventListener('click',()=>{const v=document.getElementById('tutoVid');v.currentTime=+b.dataset.t;v.play();}));</script>
 
     <h2>Installation (une seule fois)</h2>
     <div class="card">
