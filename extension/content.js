@@ -251,9 +251,13 @@
   // Choisit une valeur dans un menu déroulant sans recherche (ex. None → UPC)
   async function chooseFromDropdown(trigger, wantedRe) {
     if (trigger.tagName === 'SELECT') {
-      const o = [...trigger.options].find(op => wantedRe.test(op.textContent));
+      const o = [...trigger.options].find(op => wantedRe.test(op.textContent.trim()));
       if (!o) return false;
-      trigger.value = o.value;
+      // passe par le "setter" natif, sinon React ignore le changement
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+      trigger.focus();
+      setter.call(trigger, o.value);
+      trigger.dispatchEvent(new Event('input', { bubbles: true }));
       trigger.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
     }
@@ -491,18 +495,47 @@
       // Scan using : None → UPC, puis le code
       const sb = fieldBlock(/^scan using$/i);
       if (!sb) fail('« Scan using » introuvable.');
-      const trig = sb.container.querySelector('select, [role=combobox], [class*="select" i], [class*="control" i], button');
-      if (trig && !/\bupc\b/i.test(ownText(trig) + ' ' + (trig.value || ''))) {
-        const ok = await chooseFromDropdown(trig, /^upc$/i);
-        if (!ok) fail('Je n’arrive pas à choisir « UPC » dans « Scan using ».');
+      const plainInputs = () => {
+        const b = fieldBlock(/^scan using$/i);
+        return b ? [...b.container.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio])')]
+          .filter(visible).filter(i => !i.closest('[class*="select" i]') && i.getAttribute('role') !== 'combobox' && i.getAttribute('aria-autocomplete') !== 'list') : [];
+      };
+      const isUpcChosen = () => {
+        const b = fieldBlock(/^scan using$/i);
+        if (!b) return false;
+        const sel = b.container.querySelector('select');
+        if (sel) return /\bupc\b/i.test(sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '');
+        return /\bupc\b/i.test((b.container.innerText || '').replace(/scan using/i, ''));
+      };
+      if (!isUpcChosen()) {
+        const sel = sb.container.querySelector('select');
+        const tries = [];
+        if (sel) tries.push(() => chooseFromDropdown(sel, /^upc$/i));
+        // liste maison : on clique sur la valeur affichée (« None ») puis sur « UPC »
+        const noneEl = findByText(/^none$/i, sb.container)[0];
+        if (noneEl) tries.push(() => chooseFromDropdown(clickable(noneEl), /^upc$/i));
+        const trig = sb.control || sb.container.querySelector('[role=combobox], [class*="select" i], [class*="control" i], button');
+        if (trig) tries.push(() => chooseFromDropdown(trig, /^upc$/i));
+        // dernier recours : clavier (taper « UPC » puis Entrée)
+        if (trig) tries.push(async () => {
+          realClick(trig); await sleep(300);
+          const ae = document.activeElement;
+          if (ae && ae.tagName === 'INPUT') { setNativeValue(ae, 'UPC'); await sleep(400); pressKey(ae, 'Enter'); }
+          return true;
+        });
+        for (const t of tries) {
+          try { await t(); } catch (e) { /* essai suivant */ }
+          if (await waitFor(() => isUpcChosen(), 2500)) break;
+        }
+        await closeMenus();
+        if (!isUpcChosen()) fail('Je n’arrive pas à mettre « UPC » dans « Scan using ». Choisis UPC à la main, tape l’UPC, puis « Réessayer ».');
       }
-      await sleep(500);
-      const sb2 = fieldBlock(/^scan using$/i);
-      const upcInput = [...sb2.container.querySelectorAll('input:not([type=hidden]):not([type=checkbox])')]
-        .filter(visible).filter(i => !i.closest('[class*="select" i]') && i.getAttribute('role') !== 'combobox').pop();
-      if (!upcInput) fail('Champ UPC introuvable.');
-      setNativeValue(upcInput, job.upc);
-      upcInput.dispatchEvent(new Event('blur', { bubbles: true }));
+      const upcInput = await waitFor(() => plainInputs().pop(), 5000);
+      if (!upcInput) fail('« UPC » est bien choisi mais je ne trouve pas la case où taper le code. Tape-le à la main puis « Réessayer ».');
+      if (upcInput.value.replace(/\D/g, '') !== job.upc) {
+        setNativeValue(upcInput, job.upc);
+        upcInput.dispatchEvent(new Event('blur', { bubbles: true }));
+      }
       await sleep(400);
 
       // Case "Schedule rescan"
