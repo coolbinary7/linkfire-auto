@@ -129,7 +129,7 @@ function addRecords(recs) {
   let added = 0;
   for (const c of recs) {
     if (!c.artists && !c.title) continue;
-    const r = newRow({ artists: c.artists || '', title: c.title || '', upc: (c.upc || '').replace(/\D/g, ''), date: c.date || '' });
+    const r = newRow({ artists: c.artists || '', title: c.title || '', upc: (c.upc || '').replace(/\D/g, ''), date: c.date || '', cover: c.cover || '', coverName: c.coverName || '' });
     autoFill(r);
     if (rows.length === 1 && !rows[0].artists && !rows[0].title) rows = []; // remplacer la ligne vide de départ
     rows.push(r);
@@ -362,12 +362,26 @@ function scanMsg(t, ok) {
 }
 
 async function scanTabs(tabs) {
-  const recs = [], problems = [];
+  const recs = [], problems = [], noCover = [], smallCover = [];
   for (const tab of tabs) {
     try {
       const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: lfaScanRwsPage });
       const d = res && res.result;
-      if (d && d.ok) recs.push({ artists: d.artists, title: d.title, upc: d.upc, date: d.date });
+      if (d && d.ok) {
+        let cover = d.cover || '';
+        // l'image vient d'un autre site : le panneau la récupère lui-même
+        if (!cover && d.coverUrl) {
+          try {
+            const res = await fetch(d.coverUrl, { credentials: 'include' });
+            const blob = await res.blob();
+            if (res.ok && /^image\//.test(blob.type)) cover = await new Promise((ok, ko) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = ko; f.readAsDataURL(blob); });
+          } catch (e) { /* tant pis : la cover reste facultative */ }
+        }
+        const small = cover && d.coverSize && parseInt(d.coverSize, 10) < 1000;
+        if (!cover) noCover.push(d.title);
+        else if (small) smallCover.push(`${d.title} (${d.coverSize} px)`);
+        recs.push({ artists: d.artists, title: d.title, upc: d.upc, date: d.date, cover, coverName: cover ? (d.coverName || 'cover.jpg') : '' });
+      }
       else problems.push((d && d.upc) || tab.title || 'onglet');
     } catch (e) {
       problems.push(tab.title || 'onglet');
@@ -380,6 +394,9 @@ async function scanTabs(tabs) {
   let msg = added ? `${added} sortie(s) ajoutée(s) depuis RWS. Vérifie-les puis « Lancer la création ».` : '';
   if (recs.length > fresh.length) msg += ` ${recs.length - fresh.length} déjà dans la liste.`;
   if (problems.length) msg += ` Lecture impossible : ${problems.join(', ')} (recharge la page RWS et réessaie).`;
+  if (added && !noCover.length) msg += ' Cover récupérée sur RWS.';
+  if (noCover.length) msg += ` Cover introuvable pour : ${noCover.join(', ')} (ajoute-la à la main si tu l’as, sinon Linkfire la reprendra au rescan).`;
+  if (smallCover.length) msg += ` Cover en petite taille sur RWS : ${smallCover.join(', ')}.`;
   scanMsg(msg.trim() || 'Rien à ajouter.', added > 0 && !problems.length);
   if (added) document.querySelector('#rows').scrollIntoView({ behavior: 'smooth' });
 }

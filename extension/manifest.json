@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Linkfire Auto Pre-save",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Crée des liens pre-save Linkfire en série, depuis RWS, un fichier Excel ou une saisie manuelle.",
   "permissions": [
     "notifications",
@@ -13,7 +13,9 @@
   ],
   "host_permissions": [
     "https://app.linkfire.com/*",
-    "https://apps.rws.umusic.net/*"
+    "https://apps.rws.umusic.net/*",
+    "https://*.umusic.net/*",
+    "https://*.umgapps.com/*"
   ],
   "background": {
     "service_worker": "background.js"

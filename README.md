@@ -2,7 +2,7 @@
 
 Extension Chrome qui crée des liens **pre-save Linkfire** en série.
 
-Depuis une page de sortie RWS, l’extension lit l’artiste, le titre, l’UPC et la date de sortie. Sinon, tu fournis, pour chaque sortie, l’artiste ou les artistes, le titre, l’UPC, la date de sortie et une cover si tu en as une. Tu peux les saisir à la main ou importer un fichier Excel/CSV. L’extension :
+Depuis une page de sortie RWS, l’extension lit l’artiste, le titre, l’UPC, la date de sortie et récupère la cover affichée. Sinon, tu fournis, pour chaque sortie, l’artiste ou les artistes, le titre, l’UPC, la date de sortie et une cover si tu en as une. Tu peux les saisir à la main ou importer un fichier Excel/CSV. L’extension :
 
 1. clique sur *Create link* puis choisit *Pre-release* ;
 2. remplit la cover, le titre, l’artiste principal et le lien : `Artiste1xArtiste2.lnk.to/titre` (3 caractères minimum) ;
