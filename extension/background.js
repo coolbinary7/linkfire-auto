@@ -77,7 +77,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const wasBlocked = before.running && before.paused && before.pauseKind === 'error' && before.current === s.current && before.pauseReason === s.pauseReason;
   if (blocked && !wasBlocked) {
     setBadge('!', '#dc2626');
-    notify('lfa-blocked', 'Linkfire Auto a besoin de toi',
+    notify('lfa-blocked', 'Auto Release a besoin de toi',
       `${job ? job.artists.join(', ') + ' — ' + job.title + ' : ' : ''}${s.pauseReason || 'blocage'}`);
     return;
   }
@@ -95,10 +95,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const skipped = (s.queue || []).filter(j => j.status === 'skipped').length;
     if (done === total && total) {
       setBadge('✓', '#059669');
-      notify('lfa-done', 'Linkfire Auto : terminé', `${done} lien(s) créé(s). Ouvre le panneau pour les copier.`);
+      notify('lfa-done', 'Auto Release : liens Linkfire terminés', `${done} lien(s) créé(s). Ouvre le panneau pour les copier.`);
     } else {
       setBadge('', null);
-      if (done || skipped) notify('lfa-done', 'Linkfire Auto : série arrêtée', `${done}/${total} lien(s) créé(s)${skipped ? `, ${skipped} passé(s)` : ''}.`);
+      if (done || skipped) notify('lfa-done', 'Auto Release : série Linkfire arrêtée', `${done}/${total} lien(s) créé(s)${skipped ? `, ${skipped} passé(s)` : ''}.`);
     }
   }
 });

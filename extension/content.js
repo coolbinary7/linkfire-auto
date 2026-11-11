@@ -1,4 +1,4 @@
-/* Linkfire Auto Pre-save — moteur qui pilote l'interface Linkfire.
+/* Auto Release (ex-Linkfire Auto) — moteur qui pilote l'interface Linkfire.
  * Tout l'état vit dans chrome.storage.local (clé "lfa"), donc si la page
  * se recharge en cours de route, le moteur reprend à la bonne étape.
  */
@@ -750,7 +750,7 @@
         button.d{background:#4b5563}
       </style>
       <div class="box">
-        <div class="top"><span class="t">Linkfire Auto</span><span class="pill">${doneCount}/${total}</span></div>
+        <div class="top"><span class="t">Auto Release · Linkfire</span><span class="pill">${doneCount}/${total}</span></div>
         ${job ? `<div class="job">${escapeHtml(job.artists.join(', '))} — <b>${escapeHtml(job.title)}</b></div>` : ''}
         ${s.step && job ? `<div class="step">▶ ${STEP_LABELS[s.step]}</div>` : ''}
         ${s.paused ? `<div class="msg">${escapeHtml(s.pauseReason || 'En pause')}</div>` : ''}

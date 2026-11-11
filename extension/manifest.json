@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Linkfire Auto Pre-save",
-  "version": "1.8.1",
-  "description": "Crée des liens pre-save Linkfire en série et prépare les sorties dans RWS (dates, pays, post release, market scope, rush).",
+  "name": "Auto Release",
+  "version": "2.0.0",
+  "description": "Les outils Chrome d’une sortie : préparation RWS (dates, pays, post release, market scope, rush) et liens pre-save Linkfire en série.",
   "permissions": [
     "notifications",
     "scripting",
@@ -24,7 +24,7 @@
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_title": "Linkfire Auto",
+    "default_title": "Auto Release",
     "default_icon": {
       "16": "icons/16.png",
       "48": "icons/48.png",
