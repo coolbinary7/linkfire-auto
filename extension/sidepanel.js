@@ -742,3 +742,31 @@ $('#aGo').addEventListener('click', async () => {
   } catch (e) { msgIn('#aMsg', 'Arrêt : ' + (e.message || e)); }
   finally { $('#aGo').disabled = false; }
 });
+
+
+// ---------- RWS : expirer une sortie ----------
+(() => { const d = new Date(); d.setDate(d.getDate() - 1); $('#expDate').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+let expArmed = 0;
+$('#expGo').addEventListener('click', async () => {
+  const upc = $('#rwsUpc').value.replace(/\D/g, '');
+  const exp = $('#expDate').value;
+  if (upc.length < 12) return msgIn('#expMsg', 'Indique l’UPC de la sortie dans le champ UPC ci-dessus.');
+  if (!exp) return msgIn('#expMsg', 'Indique la date d’expiration.');
+  if (Date.now() - expArmed > 8000) {
+    expArmed = Date.now();
+    $('#expGo').textContent = `⛔ Confirmer : expirer ${upc} au ${frDate(exp)}`;
+    return msgIn('#expMsg', 'Clique encore une fois pour confirmer (8 s).');
+  }
+  expArmed = 0; $('#expGo').textContent = '⛔ Expirer cette sortie';
+  $('#expGo').disabled = true; rwsBusy = true; msgIn('#expMsg', 'Ouverture de la sortie ' + upc + '…', true);
+  try {
+    const tab = await openRelease(upc);
+    const i = await readRelease(tab, { fill: false });
+    if (!sameUpc(i.upc, upc)) return msgIn('#expMsg', `La page RWS affiche l’UPC ${i.upc}, pas ${upc}.`);
+    msgIn('#expMsg', `Expiration de ${i.artists} – ${i.title}…`, true);
+    const r = await rwsRun('expire', { expiry: exp });
+    if (!r.ok) return msgIn('#expMsg', 'Arrêt : ' + r.error + '. Fais-le à la main dans RWS.');
+    msgIn('#expMsg', r.skipped ? `Déjà expirée au ${frDate(exp)} : rien changé.` : `Terminé ✓ ${i.artists} – ${i.title} expire le ${frDate(exp)}. Vérifie la page, puis clique toi-même « Publish Release ».`, true);
+  } catch (e) { msgIn('#expMsg', 'Arrêt : ' + (e.message || e)); }
+  finally { $('#expGo').disabled = false; rwsBusy = false; }
+});

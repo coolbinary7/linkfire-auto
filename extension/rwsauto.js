@@ -219,6 +219,44 @@ async function lfaRwsStep(step, opts) {
       return { ok: true, log };
     }
 
+    if (step === 'expire') {
+      // date d'expiration sur chaque ligne de « Release Date(s) » (enregistrement de Ced, 11/11/2026)
+      const iso = opts.expiry;
+      if (!iso) throw new Error('date d’expiration manquante');
+      const mr = manage();
+      if (!mr) throw new Error('section « Manage Release » introuvable');
+      await expand(mr);
+      const art0 = article(mr, 'Release Date(s)');
+      const viewRows = (a) => [...a.querySelectorAll('table tbody tr')].filter(tr => vis(tr) && !tr.closest('form') && /\d{2}-[A-Za-z]{3}-\d{4}/.test(tr.innerText));
+      const expOf = (tr) => ((tr.cells[1] && tr.cells[1].innerText) || '').trim();
+      if (art0 && viewRows(art0).length && viewRows(art0).every(tr => norm(expOf(tr)) === norm(fmt(iso)))) { say('Expiration déjà en place.'); return { ok: true, skipped: true, log }; }
+      await openEdit(mr, 'Manage Release');
+      const art = await until(() => article(mr, 'Release Date(s)'), 5000);
+      if (!art) throw new Error('bloc « Release Date(s) » introuvable');
+      const n = viewRows(art).length;
+      if (!n) throw new Error('aucune date de sortie à expirer');
+      let done = 0;
+      for (let k = 0; k < n; k++) {
+        const tr = viewRows(art)[k];
+        if (!tr || norm(expOf(tr)) === norm(fmt(iso))) continue;
+        const ed = byText(tr, 'a', 'edit') || byText(tr, 'button', 'edit');
+        if (!ed) throw new Error('lien « edit » de la date introuvable');
+        click(ed);
+        const row = await until(() => { const f = [...art.querySelectorAll('form table tbody tr')].filter(vis); return f[f.length - 1]; }, 5000);
+        if (!row) throw new Error('la ligne ne passe pas en modification');
+        const cells = row.querySelectorAll(':scope > td');
+        if (!await pickDate(cells[1], iso)) say('⚠️ date d’expiration à vérifier');
+        const up = byText(cells[3] || row, 'button', 'update') || [...row.querySelectorAll('button')].find(b => norm(b.innerText) === 'update');
+        if (!up) throw new Error('bouton « update » introuvable');
+        click(up);
+        await until(() => !art.querySelector('form table tbody tr') || !vis(art.querySelector('form')), 5000);
+        await sleep(500); done++;
+      }
+      await saveSection(mr, 'Manage Release');
+      say(`Expiration au ${fmt(iso)} sur ${done} ligne(s).`);
+      return { ok: true, log };
+    }
+
     if (step === 'scope') {
       const b = document.querySelector('button.confirm-market-scope');
       if (!b) throw new Error('bouton « Confirm Market Scope » introuvable');

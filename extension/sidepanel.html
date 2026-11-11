@@ -33,6 +33,13 @@
     <button id="rwsRead" class="ghost" style="width:100%">🔎 Reprendre la sortie de l’onglet RWS ouvert</button>
     <ol id="rwsSteps" class="rwssteps"></ol>
     <span id="rwsMsg" class="msg"></span>
+    <details id="expBox" style="margin-top:10px">
+      <summary><b>⛔ Expirer la sortie</b> (retrait des plateformes)</summary>
+      <p class="hint">Pour l’UPC ci-dessus : Manage Release → date d’expiration sur chaque ligne « Release Date(s) » → save. Le <b>Publish Release</b> reste pour toi.</p>
+      <label>Date d’expiration<input id="expDate" type="date"></label>
+      <button id="expGo" class="ghost danger" style="width:100%">⛔ Expirer cette sortie</button>
+      <span id="expMsg" class="msg"></span>
+    </details>
   </section>
 
   <section class="card pitch">
