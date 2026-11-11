@@ -445,61 +445,121 @@ function rushAuto() {
 }
 $('#rwsDate').addEventListener('change', rushAuto);
 
+const upcOf = (url) => ((url || '').match(/apps\.rws\.umusic\.net\/releases\/(\d{12,14})/) || [])[1] || '';
+const sameUpc = (a, b) => a && b && a.replace(/^0+/, '') === b.replace(/^0+/, '');
+let rwsFilledFrom = '';   // UPC dont viennent les champs (lecture auto)
+let rwsBusy = false;     // pas de lecture auto pendant une préparation
+
+// lit une sortie RWS et met à jour les champs, le résumé, et les cartes Pitch / AIT
+async function readRelease(tab, { fill = true } = {}) {
+  rwsTabId = tab.id;
+  const r = await rwsRun('info');
+  if (!r.ok || !r.info.ok) throw new Error(r.error || 'page illisible');
+  rwsInfo = r.info;
+  const i = rwsInfo;
+  if (fill) {
+    $('#rwsUpc').value = i.upc || '';
+    if (i.date) $('#rwsDate').value = i.date;
+    rwsFilledFrom = i.upc;
+    rushAuto();
+  }
+  const snip = isSnippet();
+  const todo = [];
+  todo.push(i.hasDates ? '✓ dates et pays déjà faits' : '• date + tous les pays');
+  if (snip) todo.push(i.hasPost ? '✓ Post Release déjà fait' : '• Post Release (partenaires snippet)');
+  todo.push(i.scopeDone ? '✓ market scope déjà confirmé' : '• Confirm Market Scope');
+  todo.push('• Rush delivery si sortie dans moins de 5 jours');
+  $('#rwsSum').innerHTML = `<b>${i.artists || '?'} – ${i.title || '?'}</b><br>UPC ${i.upc} · ${i.type || 'type ?'}${snip ? ' (snippet)' : ''}<br>${todo.join('<br>')}`;
+  $('#aUpc').value = i.upc || '';
+  await loadTracks();
+  return i;
+}
+function isSnippet() {
+  const t = $('#rwsType').value;
+  if (t === 'snippet') return true;
+  if (t !== 'auto') return false;
+  return !!(rwsInfo && rwsInfo.snippet);
+}
+$('#rwsType').addEventListener('change', () => { if (rwsInfo) readRelease({ id: rwsTabId }, { fill: false }).catch(() => {}); });
+$('#rwsUpc').addEventListener('input', () => { rwsFilledFrom = ''; $('#rwsSum').innerHTML = ''; });
+
+// lecture automatique quand tu affiches une sortie dans RWS
+async function autoRead() {
+  if (rwsBusy) return;
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const upc = upcOf(tab && tab.url);
+  if (!upc || (rwsInfo && sameUpc(rwsInfo.upc, upc) && rwsTabId === tab.id)) return;
+  if ($('#rwsUpc').value && !rwsFilledFrom && !sameUpc($('#rwsUpc').value, upc)) return; // UPC tapé à la main : on n'écrase pas
+  await new Promise(r => setTimeout(r, 1500));
+  try { await readRelease(tab); rwsMsg(''); $('#rwsSteps').innerHTML = ''; } catch (e) { /* page pas encore prête */ }
+}
+chrome.tabs.onActivated.addListener(() => autoRead());
+chrome.tabs.onUpdated.addListener((id, ch, tab) => { if (ch.status === 'complete' && tab.active) autoRead(); });
+autoRead();
+
 $('#rwsRead').addEventListener('click', async () => {
   rwsMsg(''); $('#rwsSteps').innerHTML = '';
   const tab = await findRwsTab();
-  if (!tab) { $('#rwsBox').hidden = true; return rwsMsg('Ouvre d’abord la page de la sortie sur RWS (apps.rws.umusic.net/releases/…), puis clique à nouveau.'); }
-  rwsTabId = tab.id;
-  try {
-    const r = await rwsRun('info');
-    if (!r.ok || !r.info.ok) throw new Error(r.error || 'page illisible');
-    rwsInfo = r.info;
-    const i = rwsInfo;
-    const todo = [];
-    todo.push(i.hasDates ? '✓ dates et pays déjà faits' : '• date + tous les pays');
-    if (i.snippet) todo.push(i.hasPost ? '✓ Post Release déjà fait' : '• Post Release (partenaires snippet)');
-    todo.push(i.scopeDone ? '✓ market scope déjà confirmé' : '• Confirm Market Scope');
-    todo.push('• Rush delivery si sortie dans moins de 5 jours');
-    if (!i.snippet) todo.push('<i>Sortie classique : seules ces étapes sont prises en charge pour l’instant (enregistrement à venir).</i>');
-    $('#rwsSum').innerHTML = `<b>${i.artists || '?'} – ${i.title || '?'}</b><br>UPC ${i.upc} · ${i.type || 'type ?'}${i.snippet ? ' (snippet)' : ''}<br>${todo.join('<br>')}`;
-    $('#rwsDate').value = i.date || '';
-    rushAuto();
-    $('#aUpc').value = i.upc || '';
-    await loadTracks();
-    $('#rwsBox').hidden = false;
-    if (!i.date) rwsMsg('Pas de date de sortie lue sur la page : mets-la ci-dessus.');
-  } catch (e) {
-    $('#rwsBox').hidden = true;
-    rwsMsg('Lecture impossible (' + (e.message || e) + '). Recharge la page RWS et réessaie.');
-  }
+  if (!tab) return rwsMsg('Aucune page de sortie RWS ouverte : donne l’UPC ci-dessus, l’extension l’ouvrira.');
+  try { await readRelease(tab); } catch (e) { rwsMsg('Lecture impossible (' + (e.message || e) + '). Recharge la page RWS et réessaie.'); }
 });
 
+// ouvre la sortie (UPC) dans RWS : onglet déjà ouvert, sinon l'onglet RWS actif, sinon un nouvel onglet
+async function openRelease(upc) {
+  const all = await chrome.tabs.query({ url: 'https://apps.rws.umusic.net/*' });
+  let tab = all.find(t => sameUpc(upcOf(t.url), upc));
+  const url = 'https://apps.rws.umusic.net/releases/' + upc;
+  if (!tab) {
+    const [act] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    tab = act && /apps\.rws\.umusic\.net/.test(act.url || '') ? act : (all[0] || null);
+    if (tab) await chrome.tabs.update(tab.id, { url, active: true });
+    else tab = await chrome.tabs.create({ url, active: true });
+    for (let i = 0; i < 60; i++) { await new Promise(r => setTimeout(r, 500)); const t = await chrome.tabs.get(tab.id); if (t.status === 'complete' && sameUpc(upcOf(t.url), upc)) break; }
+  } else await chrome.tabs.update(tab.id, { active: true });
+  // la page charge ses données après coup : on attend qu'elle affiche l'UPC
+  for (let i = 0; i < 40; i++) {
+    try { rwsTabId = tab.id; const r = await rwsRun('info'); if (r.ok && r.info.ok && sameUpc(r.info.upc, upc) && (r.info.title || r.info.type)) break; } catch (e) {}
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return tab;
+}
+
 $('#rwsGo').addEventListener('click', async () => {
-  if (!rwsTabId || !rwsInfo) return;
-  const date = $('#rwsDate').value;
-  if (!date) return rwsMsg('Indique la date de sortie.');
-  const rush = $('#rwsRush').checked;
-  const steps = [['dates', `Date ${frDate(date)} + tous les pays`]];
-  if (rwsInfo.snippet) steps.push(['post', 'Post Release : partenaires snippet']);
-  steps.push(['scope', 'Confirm Market Scope'], ['rush', `Rush delivery : ${rush ? 'Yes' : 'No'}`]);
-  const ol = $('#rwsSteps'); ol.innerHTML = '';
-  const lis = steps.map(([, t]) => { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); return li; });
-  $('#rwsGo').disabled = true; rwsMsg('');
-  chrome.tabs.update(rwsTabId, { active: true }).catch(() => {});
+  const upc = $('#rwsUpc').value.replace(/\D/g, '');
+  if (upc.length < 12) return rwsMsg('Indique l’UPC de la sortie (12 à 14 chiffres).');
+  $('#rwsGo').disabled = true; rwsBusy = true; rwsMsg(''); $('#rwsSteps').innerHTML = '';
   try {
+    rwsMsg('Ouverture de la sortie ' + upc + ' dans RWS…', true);
+    const tab = await openRelease(upc);
+    const keepDate = $('#rwsDate').value;
+    const i = await readRelease(tab, { fill: false });
+    if (!sameUpc(i.upc, upc)) return rwsMsg(`La page RWS affiche l’UPC ${i.upc}, pas ${upc} : vérifie l’UPC.`);
+    const date = keepDate || i.date;
+    if (!date) return rwsMsg('Indique la date de sortie.');
+    $('#rwsDate').value = date; rushAuto();
+    const rush = $('#rwsRush').checked;
+    const snip = isSnippet();
+    if ($('#rwsType').value === 'auto' && !i.type) return rwsMsg('Type de sortie non lu sur RWS : choisis-le dans « Type de sortie ».');
+    rwsMsg('');
+    const steps = [['dates', `Date ${frDate(date)} + tous les pays`]];
+    if (snip) steps.push(['post', 'Post Release : partenaires snippet']);
+    steps.push(['scope', 'Confirm Market Scope'], ['rush', `Rush delivery : ${rush ? 'Yes' : 'No'}`]);
+    const ol = $('#rwsSteps');
+    const lis = steps.map(([, t]) => { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); return li; });
     for (let k = 0; k < steps.length; k++) {
       lis[k].className = 'run'; lis[k].textContent = steps[k][1] + ' …';
       const r = await rwsRun(steps[k][0], { date, rush });
       if (!r.ok) {
         lis[k].className = 'ko'; lis[k].textContent = steps[k][1] + ' ✗';
-        rwsMsg(`Arrêt : ${r.error}. Fais cette étape à la main dans RWS, puis relance : ce qui est déjà fait sera sauté.`);
-        return;
+        return rwsMsg(`Arrêt : ${r.error}. Fais cette étape à la main dans RWS, puis relance : ce qui est déjà fait sera sauté.`);
       }
       lis[k].className = r.skipped ? 'skip' : 'ok';
       lis[k].textContent = steps[k][1] + (r.skipped ? ' (déjà fait)' : ' ✓');
     }
-    rwsMsg('Terminé ✓ Vérifie la page, puis clique toi-même « Publish Release ».', true);
-  } finally { $('#rwsGo').disabled = false; }
+    await readRelease(tab, { fill: false }).catch(() => {});
+    rwsMsg(`Terminé ✓ ${i.artists} – ${i.title} : vérifie la page, puis clique toi-même « Publish Release ».`, true);
+  } catch (e) { rwsMsg('Arrêt : ' + (e.message || e)); }
+  finally { $('#rwsGo').disabled = false; }
 });
 
 
@@ -543,7 +603,7 @@ async function sheetTab(open) {
 
 $('#pSheet').addEventListener('click', async () => {
   const row = currentPitch();
-  if (!row) return msgIn('#pSheetMsg', 'Lis d’abord la sortie RWS (🔎 plus haut).');
+  if (!row) return msgIn('#pSheetMsg', 'Affiche d’abord la sortie dans RWS (carte RWS ci-dessus).');
   $('#pSheet').disabled = true; msgIn('#pSheetMsg', 'Ouverture du tableau PITCH…', true);
   try {
     const tab = await sheetTab(true);
@@ -576,7 +636,7 @@ for (const id of [...Object.keys(PF), 'pPin']) $('#' + id).addEventListener('cha
 
 $('#pFromSheet').addEventListener('click', async () => {
   const row = currentPitch();
-  if (!row) return msgIn('#pMsg', 'Lis d’abord la sortie RWS (🔎 plus haut).');
+  if (!row) return msgIn('#pMsg', 'Affiche d’abord la sortie dans RWS (carte RWS ci-dessus).');
   try {
     const tab = await sheetTab(true);
     const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: lfaSheetFindRow, args: [row, { sheetName: PITCH_SHEET_NAME }] });
@@ -601,7 +661,7 @@ async function s4aGoto(tabId, url) {
 
 $('#pGo').addEventListener('click', async () => {
   const row = currentPitch();
-  if (!row) return msgIn('#pMsg', 'Lis d’abord la sortie RWS (🔎 plus haut).');
+  if (!row) return msgIn('#pMsg', 'Affiche d’abord la sortie dans RWS (carte RWS ci-dessus).');
   savePitchPrefs();
   const o = {
     artist: row.mainArtist, release: row.release, track: row.title,

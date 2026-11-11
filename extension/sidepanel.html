@@ -20,24 +20,24 @@
   </section>
 
   <section class="card rwsprep">
-    <h2>Préparer la sortie dans RWS <small>(nouveau)</small></h2>
-    <p class="hint">Sur la page de la sortie dans RWS : dates + tous les pays, Post Release pour un snippet, Confirm Market Scope, Rush delivery. Le <b>Publish Release</b> reste pour toi.</p>
-    <button id="rwsRead" class="ghost" style="width:100%">🔎 Lire la sortie RWS ouverte</button>
-    <div id="rwsBox" hidden>
-      <div id="rwsSum" class="rwssum"></div>
-      <div class="grid2">
-        <label>Date de sortie<input id="rwsDate" type="date"></label>
-        <label class="chk"><input id="rwsRush" type="checkbox"> Rush delivery <small id="rwsRushHint"></small></label>
-      </div>
-      <button id="rwsGo" class="primary">⚙️ Préparer la sortie dans RWS</button>
+    <h2>Préparer la sortie dans RWS</h2>
+    <p class="hint">Donne l’UPC, la date et le type : l’extension ouvre la sortie dans RWS et fait dates + tous les pays, Post Release (snippet), Confirm Market Scope, Rush delivery. Le <b>Publish Release</b> reste pour toi. Si la sortie est déjà ouverte dans RWS, les champs se remplissent tout seuls.</p>
+    <div class="grid2">
+      <label>UPC<input id="rwsUpc" inputmode="numeric" placeholder="00881061927372"></label>
+      <label>Date de sortie<input id="rwsDate" type="date"></label>
+      <label>Type de sortie<select id="rwsType"><option value="auto">Lu sur RWS</option><option value="snippet">Snippet (eSnippet Audio)</option><option value="single">Single (eSingle Audio)</option><option value="album">Album / EP</option></select></label>
+      <label class="chk"><input id="rwsRush" type="checkbox"> Rush delivery <small id="rwsRushHint"></small></label>
     </div>
+    <div id="rwsSum" class="rwssum"></div>
+    <button id="rwsGo" class="primary">⚙️ Préparer la sortie dans RWS</button>
+    <button id="rwsRead" class="ghost" style="width:100%">🔎 Reprendre la sortie de l’onglet RWS ouvert</button>
     <ol id="rwsSteps" class="rwssteps"></ol>
     <span id="rwsMsg" class="msg"></span>
   </section>
 
   <section class="card pitch">
     <h2>Pitch <small>(tableau PITCH + Spotify for Artists)</small></h2>
-    <p class="hint">Lis d’abord la sortie RWS ci-dessus (🔎). Le tableau PITCH peut être déjà ouvert dans un onglet ; sinon l’extension l’ouvre.</p>
+    <p class="hint">Utilise la sortie de la carte RWS ci-dessus. Le tableau PITCH peut être déjà ouvert dans un onglet ; sinon l’extension l’ouvre.</p>
     <label>Titre à pitcher<select id="pTrack"></select></label>
     <button id="pSheet" class="ghost" style="width:100%">📋 Ajouter la sortie au tableau PITCH</button>
     <span id="pSheetMsg" class="msg"></span>

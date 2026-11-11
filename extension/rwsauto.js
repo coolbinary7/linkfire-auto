@@ -115,7 +115,15 @@ async function lfaRwsStep(step, opts) {
     return norm(inp.value) === norm(want);
   }
 
+  // une section repliée cache son bouton « edit » : on la déplie d'abord (clic sur son titre, comme à la main)
+  async function expand(section) {
+    if (headerBtn(section, 'edit') || headerBtn(section, 'save')) return;
+    const head = section.querySelector('header.expandable-section-header, header');
+    const title = head && (head.querySelector('ul > li:first-child') || head.querySelector('h1,h2,h3') || head);
+    if (title) { click(title.querySelector('h1,h2,h3') || title); await until(() => headerBtn(section, 'edit') || headerBtn(section, 'save'), 5000); await sleep(300); }
+  }
   async function openEdit(section, label) {
+    await expand(section);
     if (headerBtn(section, 'save')) return true;
     const e = headerBtn(section, 'edit');
     if (!e) throw new Error(`bouton « edit » de ${label} introuvable`);
@@ -142,6 +150,7 @@ async function lfaRwsStep(step, opts) {
     if (step === 'info') return { ok: true, info: pageInfo(), log };
 
     if (step === 'dates') {
+      if (manage()) await expand(manage());
       const info = pageInfo();
       if (info.hasDates) { say('Dates et pays déjà en place : rien à faire.'); return { ok: true, skipped: true, log }; }
       const iso = opts.date || info.date;
@@ -170,6 +179,7 @@ async function lfaRwsStep(step, opts) {
     }
 
     if (step === 'post') {
+      if (manage()) await expand(manage());
       const info = pageInfo();
       if (info.hasPost) { say('Post Release déjà en place : rien à faire.'); return { ok: true, skipped: true, log }; }
       const iso = opts.date || info.date;
@@ -224,6 +234,7 @@ async function lfaRwsStep(step, opts) {
       const ds = document.querySelector('section.delivery-settings');
       if (!ds) throw new Error('section « Delivery Settings » introuvable');
       const want = !!opts.rush;
+      await expand(ds);
       const cur = document.querySelector('input#rush-yes');
       if (cur && cur.checked === want && !headerBtn(ds, 'save')) { say(`Rush delivery déjà sur ${want ? 'Yes' : 'No'}.`); return { ok: true, skipped: true, log }; }
       await openEdit(ds, 'Delivery Settings');
