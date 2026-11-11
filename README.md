@@ -13,7 +13,7 @@ Depuis une page de sortie RWS, l’extension lit l’artiste, le titre, l’UPC,
 4. dans *Rescan link*, choisit *UPC*, saisit le code, coche *Schedule rescan* et met la date de sortie ;
 5. publie, puis récupère le lien.
 
-**Page de téléchargement et mode d’emploi :** https://coolbinary7.github.io/auto-release/
+**Page de téléchargement et mode d’emploi :** https://coolbinary7.github.io/linkfire-auto/
 
 ## Contenu du dépôt
 
