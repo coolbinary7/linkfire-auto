@@ -35,6 +35,34 @@
     <span id="rwsMsg" class="msg"></span>
   </section>
 
+  <section class="card pitch">
+    <h2>Pitch <small>(tableau PITCH + Spotify for Artists)</small></h2>
+    <p class="hint">Lis d’abord la sortie RWS ci-dessus (🔎). Le tableau PITCH peut être déjà ouvert dans un onglet ; sinon l’extension l’ouvre.</p>
+    <label>Titre à pitcher<select id="pTrack"></select></label>
+    <button id="pSheet" class="ghost" style="width:100%">📋 Ajouter la sortie au tableau PITCH</button>
+    <span id="pSheetMsg" class="msg"></span>
+    <details id="pS4a">
+      <summary><b>🎧 Pitch Spotify for Artists</b> (s’arrête avant « Pitch »)</summary>
+      <div class="grid2">
+        <label>Ville d’origine<input id="pCity"></label>
+        <label>Langue des paroles<input id="pLang"></label>
+        <label class="full">Genres <small>(3 max, séparés par des virgules)</small><input id="pGenres"></label>
+        <label class="full">Styles <small>(2 max, ex. Beats ; vide = aucun)</small><input id="pStyles"></label>
+        <label>Cultures <small>(2 max)</small><input id="pCultures"></label>
+        <label>Moods <small>(2 max)</small><input id="pMoods"></label>
+        <label class="full">Instruments<input id="pInstr"></label>
+        <label class="chk"><input id="pPin" type="checkbox"> Épingler sur « This Is »</label>
+        <label class="chk"><input id="pLive" type="checkbox"> Enregistré en live</label>
+        <label class="chk"><input id="pCover" type="checkbox"> C’est une reprise</label>
+        <label class="chk"><input id="pRemix" type="checkbox"> C’est un remix</label>
+        <label class="chk"><input id="pInstrumental" type="checkbox"> Instrumental</label>
+        <label class="full">Description du pitch <button id="pFromSheet" class="ghost" style="margin:0 0 0 6px;padding:2px 8px">↧ reprendre du tableau</button><textarea id="pDesc" rows="5" placeholder="Le texte du pitch Spotify"></textarea></label>
+      </div>
+      <button id="pGo" class="primary">🎧 Préparer le pitch Spotify</button>
+      <span id="pMsg" class="msg"></span>
+    </details>
+  </section>
+
   <section class="card">
     <h2>1. Ou importer tes sorties <small>(Excel, copier-coller)</small></h2>
     <p class="hint">Colonnes : <b>Artiste(s)</b> · <b>Titre</b> · <b>UPC</b> · <b>Date de sortie</b> (JJ/MM/AAAA)</p>
@@ -85,6 +113,7 @@
   <script src="xlsx.full.min.js"></script>
   <script src="rws.js"></script>
   <script src="rwsauto.js"></script>
+  <script src="pitch.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

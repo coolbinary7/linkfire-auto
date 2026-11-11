@@ -59,8 +59,8 @@
       </div>
       <aside class="side">
         <div class="side-label">Version actuelle</div>
-        <div class="ver">2.0.0</div>
-        <a class="btn p" href="./downloads/Auto-Release-2.0.0.zip">Télécharger l’extension</a>
+        <div class="ver">2.1.0</div>
+        <a class="btn p" href="./downloads/Auto-Release-2.1.0.zip">Télécharger l’extension</a>
         <a class="btn s" href="./downloads/modele-sorties-linkfire.xlsx">Modèle Excel des sorties</a>
         <a class="btn" style="background:#fff;border:1px solid var(--line);color:var(--ink)" href="#tuto">▶ Voir le tuto vidéo (1 min)</a>
         <p class="note">À installer sur un ordinateur où Linkfire est déjà accessible et connecté dans Chrome.</p>
@@ -73,6 +73,16 @@
       <div class="chaps"><button data-t="4">Installer<span>0:04</span></button><button data-t="14">Scanner RWS<span>0:14</span></button><button data-t="30">Lancer la création<span>0:30</span></button><button data-t="49">À retenir<span>0:49</span></button><a class="dl" href="./videos/tuto-linkfire-auto.mp4" download>Télécharger la vidéo</a></div>
     </div>
     <script>document.querySelectorAll('.chaps button').forEach(b=>b.addEventListener('click',()=>{const v=document.getElementById('tutoVid');v.currentTime=+b.dataset.t;v.play();}));</script>
+
+    <h2 id="pitch">Nouveau dans la 2.1 : le pitch</h2>
+    <div class="card">
+      <p>Sur la page de la sortie dans RWS, après <b>🔎 Lire la sortie RWS ouverte</b>, la carte <b>Pitch</b> propose :</p>
+      <ol>
+        <li><b>📋 Ajouter la sortie au tableau PITCH</b> : choisis le titre à pitcher (pour un album ou une deluxe, le titre mis en avant). L’extension ajoute une ligne <b>tout en haut</b> de l’onglet PITCH du fichier « UMA - PITCH - MONETISATION ISRC VIDEO » : date, UPC (zéros gardés), ISRC, artistes, titre. Si la sortie y est déjà, rien n’est ajouté. Le fichier peut être ouvert dans un autre onglet de Chrome (n’importe quelle fenêtre) ; sinon l’extension l’ouvre.</li>
+        <li><b>🎧 Pitch Spotify for Artists</b> : ville d’origine, genres, cultures, moods, instruments, langue, « This Is » et description (bouton <b>↧ reprendre du tableau</b> : colonne « Pitch Spotify », sinon « Pitch en FR »). L’extension choisit l’artiste, la sortie à venir et le titre, remplit les 4 étapes et <b>s’arrête sur l’écran Review</b> : c’est toi qui cliques « Pitch ». Tes réglages sont gardés pour la fois suivante.</li>
+      </ol>
+      <p class="note">Il faut être connecté à Google (le compte qui a accès au tableau) et à Spotify for Artists dans Chrome.</p>
+    </div>
 
     <h2 id="rws">Préparer la sortie dans RWS</h2>
     <div class="card">

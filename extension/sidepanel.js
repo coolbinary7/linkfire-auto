@@ -464,6 +464,7 @@ $('#rwsRead').addEventListener('click', async () => {
     $('#rwsSum').innerHTML = `<b>${i.artists || '?'} – ${i.title || '?'}</b><br>UPC ${i.upc} · ${i.type || 'type ?'}${i.snippet ? ' (snippet)' : ''}<br>${todo.join('<br>')}`;
     $('#rwsDate').value = i.date || '';
     rushAuto();
+    await loadTracks();
     $('#rwsBox').hidden = false;
     if (!i.date) rwsMsg('Pas de date de sortie lue sur la page : mets-la ci-dessus.');
   } catch (e) {
@@ -498,4 +499,137 @@ $('#rwsGo').addEventListener('click', async () => {
     }
     rwsMsg('Terminé ✓ Vérifie la page, puis clique toi-même « Publish Release ».', true);
   } finally { $('#rwsGo').disabled = false; }
+});
+
+
+// ---------- Pitch : tableau PITCH + Spotify for Artists ----------
+const PITCH_SHEET_ID = '1NYTqBuEYuV_E7UVyXTKf7vMmJXCbXtQpB3KLEXfYwu8';
+const PITCH_SHEET_URL = `https://docs.google.com/spreadsheets/d/${PITCH_SHEET_ID}/edit#gid=2067107217`;
+const PITCH_SHEET_NAME = 'PITCH';
+const PDEF = { city: 'Abidjan', lang: 'French', genres: 'Hip Hop, Rap Ivoire', styles: '', cultures: 'African', moods: 'Energetic', instr: 'Samples, Drum Kit', pin: true };
+let rwsTracks = [];
+const list = (t) => (t || '').split(/\s*[,;]\s*/).map(x => x.trim()).filter(Boolean);
+function msgIn(sel, t, ok) { const el = $(sel); el.style.color = ok ? '#059669' : ''; el.textContent = t; }
+
+async function loadTracks() {
+  rwsTracks = [];
+  try {
+    const [res] = await chrome.scripting.executeScript({ target: { tabId: rwsTabId }, func: lfaRwsTracks });
+    rwsTracks = (res && res.result) || [];
+  } catch (e) { /* pas de pistes lisibles */ }
+  const sel = $('#pTrack'); sel.innerHTML = '';
+  const tracks = rwsTracks.length ? rwsTracks : [{ title: rwsInfo.title, artist: rwsInfo.artists, isrc: '' }];
+  tracks.forEach((t, k) => { const o = document.createElement('option'); o.value = k; o.textContent = `${t.n ? t.n + '. ' : ''}${t.title}${t.version ? ' (' + t.version + ')' : ''}${t.isrc ? ' · ' + t.isrc : ''}`; sel.appendChild(o); });
+  if (!rwsTracks.length) rwsTracks = tracks;
+}
+function currentPitch() {
+  if (!rwsInfo) return null;
+  const t = rwsTracks[+$('#pTrack').value || 0] || { title: rwsInfo.title, artist: rwsInfo.artists };
+  const iso = $('#rwsDate').value || rwsInfo.date;
+  // un single garde le titre de la sortie ; un projet (EP, album, deluxe) prend le titre choisi
+  return { date: iso ? iso.split('-').reverse().join('/') : '', upc: rwsInfo.upc, isrc: t.isrc || '', artist: t.artist || rwsInfo.artists, title: t.title || rwsInfo.title, release: rwsInfo.title, mainArtist: (rwsInfo.artists || '').split(/\s*(?:,|&|\bfeat\.?|\bft\.?|\sx\s)\s*/i)[0] };
+}
+async function sheetTab(open) {
+  let tabs = await chrome.tabs.query({ url: `https://docs.google.com/spreadsheets/d/${PITCH_SHEET_ID}/*` });
+  if (tabs.length) return tabs[0];
+  if (!open) return null;
+  const tab = await chrome.tabs.create({ url: PITCH_SHEET_URL, active: false });
+  for (let i = 0; i < 60; i++) { await new Promise(r => setTimeout(r, 500)); const t = await chrome.tabs.get(tab.id); if (t.status === 'complete') break; }
+  await new Promise(r => setTimeout(r, 5000));
+  return tab;
+}
+
+$('#pSheet').addEventListener('click', async () => {
+  const row = currentPitch();
+  if (!row) return msgIn('#pSheetMsg', 'Lis d’abord la sortie RWS (🔎 plus haut).');
+  $('#pSheet').disabled = true; msgIn('#pSheetMsg', 'Ouverture du tableau PITCH…', true);
+  try {
+    const tab = await sheetTab(true);
+    await chrome.tabs.update(tab.id, { active: true });
+    msgIn('#pSheetMsg', 'Ajout de la ligne…', true);
+    const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: lfaSheetAddRow, args: [{ date: row.date, upc: row.upc, isrc: row.isrc, artist: row.artist, title: row.title }, { sheetName: PITCH_SHEET_NAME }] });
+    const r = (res && res.result) || {};
+    if (r.ok && r.skipped) msgIn('#pSheetMsg', `Déjà dans le tableau (ligne ${r.line}) : rien ajouté.`, true);
+    else if (r.ok) msgIn('#pSheetMsg', `Ligne ajoutée en haut du tableau PITCH : ${row.date} · ${row.upc} · ${row.artist} · ${row.title}. Complète le pitch (FR/ENG), les liens et le genre.`, true);
+    else msgIn('#pSheetMsg', 'Arrêt : ' + (r.error || 'erreur inconnue') + (r.unsure ? ' Vérifie le haut du tableau.' : ''));
+  } catch (e) { msgIn('#pSheetMsg', 'Arrêt : ' + (e.message || e)); }
+  finally { $('#pSheet').disabled = false; }
+});
+
+// réglages du pitch Spotify (mémorisés)
+const PF = { pCity: 'city', pLang: 'lang', pGenres: 'genres', pStyles: 'styles', pCultures: 'cultures', pMoods: 'moods', pInstr: 'instr' };
+async function loadPitchPrefs() {
+  const d = (await chrome.storage.local.get('lfa_pitch')).lfa_pitch || {};
+  const v = { ...PDEF, ...d };
+  for (const [id, k] of Object.entries(PF)) $('#' + id).value = v[k] || '';
+  $('#pPin').checked = v.pin !== false;
+}
+function savePitchPrefs() {
+  const v = { pin: $('#pPin').checked };
+  for (const [id, k] of Object.entries(PF)) v[k] = $('#' + id).value;
+  chrome.storage.local.set({ lfa_pitch: v });
+}
+loadPitchPrefs();
+for (const id of [...Object.keys(PF), 'pPin']) $('#' + id).addEventListener('change', savePitchPrefs);
+
+$('#pFromSheet').addEventListener('click', async () => {
+  const row = currentPitch();
+  if (!row) return msgIn('#pMsg', 'Lis d’abord la sortie RWS (🔎 plus haut).');
+  try {
+    const tab = await sheetTab(true);
+    const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: lfaSheetFindRow, args: [row, { sheetName: PITCH_SHEET_NAME }] });
+    const r = (res && res.result) || {};
+    if (!r.ok) return msgIn('#pMsg', 'Tableau : ' + (r.error || 'lecture impossible'));
+    const txt = r.pitchSpotify || r.pitchFr || r.pitchEn;
+    if (!txt) return msgIn('#pMsg', 'Pas encore de texte de pitch sur cette ligne du tableau (colonnes « Pitch Spotify » ou « Pitch en FR »).');
+    $('#pDesc').value = txt;
+    msgIn('#pMsg', `Texte repris du tableau (${r.pitchSpotify ? 'Pitch Spotify' : r.pitchFr ? 'Pitch en FR' : 'Pitch en ENG'}).`, true);
+  } catch (e) { msgIn('#pMsg', 'Tableau : ' + (e.message || e)); }
+});
+
+async function s4aRun(tabId, step, o) {
+  const [res] = await chrome.scripting.executeScript({ target: { tabId }, func: lfaS4aStep, args: [step, o] });
+  return (res && res.result) || { ok: false, error: 'pas de réponse de la page' };
+}
+async function s4aGoto(tabId, url) {
+  await chrome.tabs.update(tabId, { url });
+  for (let i = 0; i < 60; i++) { await new Promise(r => setTimeout(r, 500)); const t = await chrome.tabs.get(tabId); if (t.status === 'complete' && t.url.startsWith(url.split('?')[0].slice(0, 40))) break; }
+  await new Promise(r => setTimeout(r, 2500));
+}
+
+$('#pGo').addEventListener('click', async () => {
+  const row = currentPitch();
+  if (!row) return msgIn('#pMsg', 'Lis d’abord la sortie RWS (🔎 plus haut).');
+  savePitchPrefs();
+  const o = {
+    artist: row.mainArtist, release: row.release, track: row.title,
+    city: $('#pCity').value.trim(), language: $('#pLang').value.trim(),
+    genres: list($('#pGenres').value).slice(0, 3), styles: list($('#pStyles').value).slice(0, 2), cultures: list($('#pCultures').value).slice(0, 2),
+    moods: list($('#pMoods').value).slice(0, 2), instruments: list($('#pInstr').value),
+    pin: $('#pPin').checked, live: $('#pLive').checked, cover: $('#pCover').checked, remix: $('#pRemix').checked, instrumental: $('#pInstrumental').checked,
+    description: $('#pDesc').value.trim()
+  };
+  if (!o.description) return msgIn('#pMsg', 'Ajoute la description du pitch (ou « reprendre du tableau »).');
+  if (!o.genres.length) return msgIn('#pMsg', 'Indique au moins un genre.');
+  $('#pGo').disabled = true;
+  try {
+    let [tab] = await chrome.tabs.query({ url: 'https://artists.spotify.com/*' });
+    if (!tab) tab = await chrome.tabs.create({ url: 'https://artists.spotify.com/c/roster', active: true });
+    else await chrome.tabs.update(tab.id, { active: true });
+    msgIn('#pMsg', `Spotify for Artists : recherche de ${o.artist}…`, true);
+    await s4aGoto(tab.id, 'https://artists.spotify.com/c/roster');
+    const a = await s4aRun(tab.id, 'findArtist', o);
+    if (!a.ok) return msgIn('#pMsg', 'Arrêt : ' + a.error + (a.choices && a.choices.length ? ' (proposés : ' + a.choices.join(', ') + ')' : ''));
+    msgIn('#pMsg', 'Sorties à venir…', true);
+    await s4aGoto(tab.id, `https://artists.spotify.com/c/artist/${a.artistId}/music/upcoming`);
+    const rel = await s4aRun(tab.id, 'findRelease', o);
+    if (!rel.ok) return msgIn('#pMsg', 'Arrêt : ' + rel.error + (rel.choices ? ' : ' + rel.choices.join(' / ') : ''));
+    msgIn('#pMsg', `Pitch de « ${o.track} »…`, true);
+    await s4aGoto(tab.id, 'https://artists.spotify.com' + (rel.href.startsWith('/c/') ? '' : '/c') + rel.href);
+    const w = await s4aRun(tab.id, 'wizard', o);
+    if (!w.ok) return msgIn('#pMsg', `Arrêt (${w.step || 'pitch'}) : ${w.error}. Termine à la main dans Spotify for Artists.`);
+    const warn = (w.log || []).filter(l => l.startsWith('⚠️')).join(' ');
+    msgIn('#pMsg', `Prêt ✓ Le pitch est sur l’écran « Review » : vérifie, puis clique toi-même « Pitch ».${warn ? ' ' + warn : ''}`, !warn);
+  } catch (e) { msgIn('#pMsg', 'Arrêt : ' + (e.message || e)); }
+  finally { $('#pGo').disabled = false; }
 });

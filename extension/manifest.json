@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Auto Release",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Les outils Chrome d’une sortie : préparation RWS (dates, pays, post release, market scope, rush) et liens pre-save Linkfire en série.",
   "permissions": [
     "notifications",
@@ -15,7 +15,9 @@
     "https://app.linkfire.com/*",
     "https://apps.rws.umusic.net/*",
     "https://*.umusic.net/*",
-    "https://*.umgapps.com/*"
+    "https://*.umgapps.com/*",
+    "https://docs.google.com/*",
+    "https://artists.spotify.com/*"
   ],
   "background": {
     "service_worker": "background.js"
