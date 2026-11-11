@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Auto Release",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Les outils Chrome d’une sortie : préparation RWS (dates, pays, post release, market scope, rush) et liens pre-save Linkfire en série.",
   "permissions": [
     "notifications",

@@ -464,6 +464,7 @@ $('#rwsRead').addEventListener('click', async () => {
     $('#rwsSum').innerHTML = `<b>${i.artists || '?'} – ${i.title || '?'}</b><br>UPC ${i.upc} · ${i.type || 'type ?'}${i.snippet ? ' (snippet)' : ''}<br>${todo.join('<br>')}`;
     $('#rwsDate').value = i.date || '';
     rushAuto();
+    $('#aUpc').value = i.upc || '';
     await loadTracks();
     $('#rwsBox').hidden = false;
     if (!i.date) rwsMsg('Pas de date de sortie lue sur la page : mets-la ci-dessus.');
@@ -506,6 +507,7 @@ $('#rwsGo').addEventListener('click', async () => {
 const PITCH_SHEET_ID = '1NYTqBuEYuV_E7UVyXTKf7vMmJXCbXtQpB3KLEXfYwu8';
 const PITCH_SHEET_URL = `https://docs.google.com/spreadsheets/d/${PITCH_SHEET_ID}/edit#gid=2067107217`;
 const PITCH_SHEET_NAME = 'PITCH';
+const PITCH_GID = '2067107217';
 const PDEF = { city: 'Abidjan', lang: 'French', genres: 'Hip Hop, Rap Ivoire', styles: '', cultures: 'African', moods: 'Energetic', instr: 'Samples, Drum Kit', pin: true };
 let rwsTracks = [];
 const list = (t) => (t || '').split(/\s*[,;]\s*/).map(x => x.trim()).filter(Boolean);
@@ -547,7 +549,7 @@ $('#pSheet').addEventListener('click', async () => {
     const tab = await sheetTab(true);
     await chrome.tabs.update(tab.id, { active: true });
     msgIn('#pSheetMsg', 'Ajout de la ligne…', true);
-    const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: lfaSheetAddRow, args: [{ date: row.date, upc: row.upc, isrc: row.isrc, artist: row.artist, title: row.title }, { sheetName: PITCH_SHEET_NAME }] });
+    const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: lfaSheetAddRow, args: [{ date: row.date, upc: row.upc, isrc: row.isrc, artist: row.artist, title: row.title }, { sheetName: PITCH_SHEET_NAME, gid: PITCH_GID }] });
     const r = (res && res.result) || {};
     if (r.ok && r.skipped) msgIn('#pSheetMsg', `Déjà dans le tableau (ligne ${r.line}) : rien ajouté.`, true);
     else if (r.ok) msgIn('#pSheetMsg', `Ligne ajoutée en haut du tableau PITCH : ${row.date} · ${row.upc} · ${row.artist} · ${row.title}. Complète le pitch (FR/ENG), les liens et le genre.`, true);
@@ -632,4 +634,51 @@ $('#pGo').addEventListener('click', async () => {
     msgIn('#pMsg', `Prêt ✓ Le pitch est sur l’écran « Review » : vérifie, puis clique toi-même « Pitch ».${warn ? ' ' + warn : ''}`, !warn);
   } catch (e) { msgIn('#pMsg', 'Arrêt : ' + (e.message || e)); }
   finally { $('#pGo').disabled = false; }
+});
+
+
+// ---------- AIT : brouillon d'ingestion audio ----------
+const AIT_URL = 'https://ait.umgapps.com/';
+async function aitRun(tabId, step, o) {
+  const [res] = await chrome.scripting.executeScript({ target: { tabId }, func: lfaAitStep, args: [step, o || {}] });
+  return (res && res.result) || { ok: false, error: 'pas de réponse de la page' };
+}
+$('#aGo').addEventListener('click', async () => {
+  const upc = $('#aUpc').value.replace(/\D/g, '');
+  if (upc.length < 12) return msgIn('#aMsg', 'Indique l’UPC (ou lis d’abord la sortie RWS).');
+  const ol = $('#aSteps'); ol.innerHTML = '';
+  const step = (t) => { const li = document.createElement('li'); li.className = 'run'; li.textContent = t + ' …'; ol.appendChild(li); return { ok: (x) => { li.className = 'ok'; li.textContent = t + (x ? ' : ' + x : ' ✓'); }, ko: () => { li.className = 'ko'; li.textContent = t + ' ✗'; } }; };
+  $('#aGo').disabled = true; msgIn('#aMsg', '');
+  try {
+    let [tab] = await chrome.tabs.query({ url: 'https://ait.umgapps.com/*' });
+    if (!tab) { tab = await chrome.tabs.create({ url: AIT_URL, active: true }); for (let i = 0; i < 60; i++) { await new Promise(r => setTimeout(r, 500)); if ((await chrome.tabs.get(tab.id)).status === 'complete') break; } await new Promise(r => setTimeout(r, 2500)); }
+    else await chrome.tabs.update(tab.id, { active: true });
+    let s = step(`Brouillon AIT pour l’UPC ${upc}`);
+    const st = await aitRun(tab.id, 'start', { upc });
+    if (!st.ok) { s.ko(); return msgIn('#aMsg', 'Arrêt : ' + st.error); }
+    s.ok(st.already ? 'déjà ouvert' : '');
+    s = step('Fichiers audio');
+    let info, t0 = Date.now(), last = -1, stable = 0;
+    msgIn('#aMsg', 'Glisse maintenant tes fichiers audio (WAV) dans AIT, sur « Drop the folder or files here ». Je continue tout seul.', true);
+    for (;;) {
+      info = await aitRun(tab.id, 'state');
+      const n = (info.files || []).length + (info.tracks || []).filter(t => t.file).length;
+      if (info.ok && n && !info.analyzing) { stable = n === last ? stable + 1 : 0; last = n; if (stable >= 2) break; }
+      if (Date.now() - t0 > 15 * 60e3) { s.ko(); return msgIn('#aMsg', 'Pas de fichiers reçus après 15 min : relance quand tu es prêt.'); }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    const nFiles = new Set([...(info.files || []).map(f => f.name), ...(info.tracks || []).map(t => t.file).filter(Boolean)]).size;
+    s.ok(`${nFiles} fichier(s) pour ${info.tracks.length} piste(s)`);
+    s = step('Association fichier ↔ piste');
+    const m = await aitRun(tab.id, 'map');
+    if (!m.ok) {
+      s.ko();
+      return msgIn('#aMsg', (m.error ? 'Arrêt : ' + m.error : 'Je n’ai pas réussi à tout associer. À glisser à la main : ' + (m.wrong || []).join(' ; ')) + ((m.log || []).length ? ' ' + m.log.join(' ') : ''));
+    }
+    s.ok((m.plan || []).map(p => `${p.n}←${p.file.replace(/\.[^.]+$/, '')}`).join(', '));
+    const end = await aitRun(tab.id, 'state');
+    const warn = (m.log || []).join(' ');
+    msgIn('#aMsg', `Prêt ✓ Vérifie l’association${end.status ? ' (AIT : ' + end.status + ')' : ''}, puis clique toi-même « Submit Job ».${warn ? ' ' + warn : ''}`, !warn);
+  } catch (e) { msgIn('#aMsg', 'Arrêt : ' + (e.message || e)); }
+  finally { $('#aGo').disabled = false; }
 });

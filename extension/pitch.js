@@ -36,7 +36,8 @@ async function lfaSheetAddRow(row, opts) {
   const key = (el, k, kc) => { for (const t of ['keydown', 'keypress', 'keyup']) el.dispatchEvent(new KeyboardEvent(t, { key: k, code: k, keyCode: kc, which: kc, bubbles: true, cancelable: true })); };
   const items = () => [...document.querySelectorAll('.goog-menuitem')].filter(e => e.offsetParent);
   async function until(fn, ms = 6000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { const v = fn(); if (v) return v; } catch (e) {} await sleep(150); } return null; }
-  const curGid = () => (location.href.match(/gid=(\d+)/) || [])[1] || '';
+  // l'onglet affiché est dans « ?gid= » (le « #gid= » peut être en retard)
+  const curGid = () => new URLSearchParams(location.search).get('gid') || (location.hash.match(/gid=(\d+)/) || [])[1] || '';
   function csvParse(t) {
     const rows = []; let row = [], cell = '', q = false;
     for (let i = 0; i < t.length; i++) {
@@ -57,12 +58,16 @@ async function lfaSheetAddRow(row, opts) {
 
   try {
     // 1. Le bon onglet (PITCH)
+    // l'onglet s'affiche parfois avec un chiffre ou un symbole devant (« 1 PITCH ») : on le trouve par son identifiant (gid), sinon par son nom
     let gid = opts.gid || curGid();
-    if (opts.sheetName) {
-      const tab = [...document.querySelectorAll('.docs-sheet-tab')].find(t => norm(t.innerText) === norm(opts.sheetName));
-      if (!tab) return { ok: false, error: `onglet « ${opts.sheetName} » introuvable dans ce fichier` };
-      if (!tab.classList.contains('docs-sheet-active-tab')) { mouse(tab); await until(() => tab.classList.contains('docs-sheet-active-tab'), 5000); await sleep(800); }
-      gid = curGid() || gid;
+    if (opts.gid && curGid() !== String(opts.gid)) {
+      // nom exact, une fois retiré ce qui précède (« 1 PITCH » → « pitch ») ; jamais « Réponses Formulaire de Pitch »
+      const want = norm(opts.sheetName || '');
+      const label = (t) => norm(t.innerText).replace(/^[^a-z]*\s/, '').replace(/^\d+\s*/, '');
+      const tab = [...document.querySelectorAll('.docs-sheet-tab')].find(t => label(t) === want);
+      if (tab) { mouse(tab); await until(() => curGid() === String(opts.gid), 6000); }
+      await sleep(1000);
+      if (curGid() !== String(opts.gid)) return { ok: false, error: `impossible d’afficher l’onglet « ${opts.sheetName || opts.gid} » : clique dessus dans le tableau puis relance` };
     }
     // 2. Déjà dans le tableau ?
     const before = await readSheet(gid);

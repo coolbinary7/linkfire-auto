@@ -63,6 +63,15 @@
     </details>
   </section>
 
+  <section class="card ait">
+    <h2>AIT <small>(audio)</small></h2>
+    <p class="hint">Ouvre AIT dans un onglet. L’extension crée le brouillon avec l’UPC lu sur RWS, attend tes fichiers audio, puis associe chaque fichier à la bonne piste (numéro « partie-01 » ↔ Snippet 1 / piste 1, titre, durée). Le <b>Submit Job</b> reste pour toi.</p>
+    <label>UPC <small>(repris de RWS)</small><input id="aUpc" inputmode="numeric"></label>
+    <button id="aGo" class="primary">🎵 Préparer AIT</button>
+    <ol id="aSteps" class="rwssteps"></ol>
+    <span id="aMsg" class="msg"></span>
+  </section>
+
   <section class="card">
     <h2>1. Ou importer tes sorties <small>(Excel, copier-coller)</small></h2>
     <p class="hint">Colonnes : <b>Artiste(s)</b> · <b>Titre</b> · <b>UPC</b> · <b>Date de sortie</b> (JJ/MM/AAAA)</p>
@@ -114,6 +123,7 @@
   <script src="rws.js"></script>
   <script src="rwsauto.js"></script>
   <script src="pitch.js"></script>
+  <script src="aitauto.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

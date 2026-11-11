@@ -59,8 +59,8 @@
       </div>
       <aside class="side">
         <div class="side-label">Version actuelle</div>
-        <div class="ver">2.1.0</div>
-        <a class="btn p" href="./downloads/Auto-Release-2.1.0.zip">Télécharger l’extension</a>
+        <div class="ver">2.2.0</div>
+        <a class="btn p" href="./downloads/Auto-Release-2.2.0.zip">Télécharger l’extension</a>
         <a class="btn s" href="./downloads/modele-sorties-linkfire.xlsx">Modèle Excel des sorties</a>
         <a class="btn" style="background:#fff;border:1px solid var(--line);color:var(--ink)" href="#tuto">▶ Voir le tuto vidéo (1 min)</a>
         <p class="note">À installer sur un ordinateur où Linkfire est déjà accessible et connecté dans Chrome.</p>
@@ -74,7 +74,19 @@
     </div>
     <script>document.querySelectorAll('.chaps button').forEach(b=>b.addEventListener('click',()=>{const v=document.getElementById('tutoVid');v.currentTime=+b.dataset.t;v.play();}));</script>
 
-    <h2 id="pitch">Nouveau dans la 2.1 : le pitch</h2>
+    <h2 id="ait">Nouveau dans la 2.2 : AIT (audio)</h2>
+    <div class="card">
+      <ol>
+        <li>Ouvre AIT dans un onglet. Dans le panneau, carte <b>AIT</b> : l’UPC est repris de la sortie lue sur RWS. Clique <b>🎵 Préparer AIT</b>.</li>
+        <li>L’extension clique <b>New Draft</b>, saisit l’UPC et valide.</li>
+        <li>Glisse tes fichiers audio (WAV) dans AIT : l’extension attend la fin de l’analyse.</li>
+        <li>Elle associe chaque fichier à la bonne piste : numéro dans le nom (<code>partie-01</code> ↔ Snippet 1, ou piste 1), titre, puis durée. Elle signale les durées qui ne collent pas.</li>
+        <li>Le <b>Submit Job</b> reste pour toi.</li>
+      </ol>
+      <p class="note">2.2 corrige aussi l’ajout au tableau PITCH : l’onglet s’affiche « 1 PITCH » dans Sheets et n’était pas reconnu.</p>
+    </div>
+
+    <h2 id="pitch">Le pitch (tableau PITCH + Spotify)</h2>
     <div class="card">
       <p>Sur la page de la sortie dans RWS, après <b>🔎 Lire la sortie RWS ouverte</b>, la carte <b>Pitch</b> propose :</p>
       <ol>
