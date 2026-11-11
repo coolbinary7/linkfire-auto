@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Linkfire Auto Pre-save",
-  "version": "1.7.0",
-  "description": "Crée des liens pre-save Linkfire en série, depuis RWS, un fichier Excel ou une saisie manuelle.",
+  "version": "1.8.0",
+  "description": "Crée des liens pre-save Linkfire en série et prépare les sorties dans RWS (dates, pays, post release, market scope, rush).",
   "permissions": [
     "notifications",
     "scripting",

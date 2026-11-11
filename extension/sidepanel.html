@@ -19,6 +19,22 @@
     <span id="scanMsg" class="msg"></span>
   </section>
 
+  <section class="card rwsprep">
+    <h2>Préparer la sortie dans RWS <small>(nouveau)</small></h2>
+    <p class="hint">Sur la page de la sortie dans RWS : dates + tous les pays, Post Release pour un snippet, Confirm Market Scope, Rush delivery. Le <b>Publish Release</b> reste pour toi.</p>
+    <button id="rwsRead" class="ghost" style="width:100%">🔎 Lire la sortie RWS ouverte</button>
+    <div id="rwsBox" hidden>
+      <div id="rwsSum" class="rwssum"></div>
+      <div class="grid2">
+        <label>Date de sortie<input id="rwsDate" type="date"></label>
+        <label class="chk"><input id="rwsRush" type="checkbox" checked> Rush delivery</label>
+      </div>
+      <button id="rwsGo" class="primary">⚙️ Préparer la sortie dans RWS</button>
+    </div>
+    <ol id="rwsSteps" class="rwssteps"></ol>
+    <span id="rwsMsg" class="msg"></span>
+  </section>
+
   <section class="card">
     <h2>1. Ou importer tes sorties <small>(Excel, copier-coller)</small></h2>
     <p class="hint">Colonnes : <b>Artiste(s)</b> · <b>Titre</b> · <b>UPC</b> · <b>Date de sortie</b> (JJ/MM/AAAA)</p>
@@ -68,6 +84,7 @@
 
   <script src="xlsx.full.min.js"></script>
   <script src="rws.js"></script>
+  <script src="rwsauto.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

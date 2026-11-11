@@ -418,3 +418,71 @@ $('#scanAll').addEventListener('click', async () => {
   if (!tabs.length) return scanMsg('Aucun onglet de sortie RWS ouvert.');
   scanTabs(tabs);
 });
+
+// ---------- Préparer la sortie dans RWS ----------
+let rwsTabId = null, rwsInfo = null;
+function rwsMsg(t, ok) { const el = $('#rwsMsg'); el.style.color = ok ? '#059669' : ''; el.textContent = t; }
+async function findRwsTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (tab && /^https:\/\/apps\.rws\.umusic\.net\/releases\/\d/.test(tab.url || '')) return tab;
+  const any = (await chrome.tabs.query({ url: RWS_URL })).filter(t => /releases\/\d/.test(t.url || ''));
+  return any.length === 1 ? any[0] : null;
+}
+async function rwsRun(step, opts) {
+  const [res] = await chrome.scripting.executeScript({ target: { tabId: rwsTabId }, func: lfaRwsStep, args: [step, opts || {}] });
+  return (res && res.result) || { ok: false, error: 'pas de réponse de la page' };
+}
+const frDate = (iso) => iso ? iso.split('-').reverse().join('/') : '?';
+
+$('#rwsRead').addEventListener('click', async () => {
+  rwsMsg(''); $('#rwsSteps').innerHTML = '';
+  const tab = await findRwsTab();
+  if (!tab) { $('#rwsBox').hidden = true; return rwsMsg('Ouvre d’abord la page de la sortie sur RWS (apps.rws.umusic.net/releases/…), puis clique à nouveau.'); }
+  rwsTabId = tab.id;
+  try {
+    const r = await rwsRun('info');
+    if (!r.ok || !r.info.ok) throw new Error(r.error || 'page illisible');
+    rwsInfo = r.info;
+    const i = rwsInfo;
+    const todo = [];
+    todo.push(i.hasDates ? '✓ dates et pays déjà faits' : '• date + tous les pays');
+    if (i.snippet) todo.push(i.hasPost ? '✓ Post Release déjà fait' : '• Post Release (partenaires snippet)');
+    todo.push(i.scopeDone ? '✓ market scope déjà confirmé' : '• Confirm Market Scope');
+    todo.push('• Rush delivery');
+    $('#rwsSum').innerHTML = `<b>${i.artists || '?'} – ${i.title || '?'}</b><br>UPC ${i.upc} · ${i.type || 'type ?'}${i.snippet ? ' (snippet)' : ''}<br>${todo.join('<br>')}`;
+    $('#rwsDate').value = i.date || '';
+    $('#rwsBox').hidden = false;
+    if (!i.date) rwsMsg('Pas de date de sortie lue sur la page : mets-la ci-dessus.');
+  } catch (e) {
+    $('#rwsBox').hidden = true;
+    rwsMsg('Lecture impossible (' + (e.message || e) + '). Recharge la page RWS et réessaie.');
+  }
+});
+
+$('#rwsGo').addEventListener('click', async () => {
+  if (!rwsTabId || !rwsInfo) return;
+  const date = $('#rwsDate').value;
+  if (!date) return rwsMsg('Indique la date de sortie.');
+  const rush = $('#rwsRush').checked;
+  const steps = [['dates', `Date ${frDate(date)} + tous les pays`]];
+  if (rwsInfo.snippet) steps.push(['post', 'Post Release : partenaires snippet']);
+  steps.push(['scope', 'Confirm Market Scope'], ['rush', `Rush delivery : ${rush ? 'Yes' : 'No'}`]);
+  const ol = $('#rwsSteps'); ol.innerHTML = '';
+  const lis = steps.map(([, t]) => { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); return li; });
+  $('#rwsGo').disabled = true; rwsMsg('');
+  chrome.tabs.update(rwsTabId, { active: true }).catch(() => {});
+  try {
+    for (let k = 0; k < steps.length; k++) {
+      lis[k].className = 'run'; lis[k].textContent = steps[k][1] + ' …';
+      const r = await rwsRun(steps[k][0], { date, rush });
+      if (!r.ok) {
+        lis[k].className = 'ko'; lis[k].textContent = steps[k][1] + ' ✗';
+        rwsMsg(`Arrêt : ${r.error}. Fais cette étape à la main dans RWS, puis relance : ce qui est déjà fait sera sauté.`);
+        return;
+      }
+      lis[k].className = r.skipped ? 'skip' : 'ok';
+      lis[k].textContent = steps[k][1] + (r.skipped ? ' (déjà fait)' : ' ✓');
+    }
+    rwsMsg('Terminé ✓ Vérifie la page, puis clique toi-même « Publish Release ».', true);
+  } finally { $('#rwsGo').disabled = false; }
+});
