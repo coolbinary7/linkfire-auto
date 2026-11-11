@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Linkfire Auto Pre-save",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Crée des liens pre-save Linkfire en série et prépare les sorties dans RWS (dates, pays, post release, market scope, rush).",
   "permissions": [
     "notifications",

@@ -433,6 +433,17 @@ async function rwsRun(step, opts) {
   return (res && res.result) || { ok: false, error: 'pas de réponse de la page' };
 }
 const frDate = (iso) => iso ? iso.split('-').reverse().join('/') : '?';
+// Rush delivery : seulement si la sortie est dans moins de 5 jours (ou déjà passée)
+function rushAuto() {
+  const v = $('#rwsDate').value;
+  if (!v) return;
+  const [y, m, d] = v.split('-').map(Number);
+  const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((new Date(y, m - 1, d) - today) / 864e5);
+  $('#rwsRush').checked = days < 5;
+  $('#rwsRushHint').textContent = days < 0 ? '(sortie déjà passée)' : days < 5 ? `(sortie dans ${days} j)` : `(sortie dans ${days} j : pas besoin)`;
+}
+$('#rwsDate').addEventListener('change', rushAuto);
 
 $('#rwsRead').addEventListener('click', async () => {
   rwsMsg(''); $('#rwsSteps').innerHTML = '';
@@ -448,9 +459,11 @@ $('#rwsRead').addEventListener('click', async () => {
     todo.push(i.hasDates ? '✓ dates et pays déjà faits' : '• date + tous les pays');
     if (i.snippet) todo.push(i.hasPost ? '✓ Post Release déjà fait' : '• Post Release (partenaires snippet)');
     todo.push(i.scopeDone ? '✓ market scope déjà confirmé' : '• Confirm Market Scope');
-    todo.push('• Rush delivery');
+    todo.push('• Rush delivery si sortie dans moins de 5 jours');
+    if (!i.snippet) todo.push('<i>Sortie classique : seules ces étapes sont prises en charge pour l’instant (enregistrement à venir).</i>');
     $('#rwsSum').innerHTML = `<b>${i.artists || '?'} – ${i.title || '?'}</b><br>UPC ${i.upc} · ${i.type || 'type ?'}${i.snippet ? ' (snippet)' : ''}<br>${todo.join('<br>')}`;
     $('#rwsDate').value = i.date || '';
+    rushAuto();
     $('#rwsBox').hidden = false;
     if (!i.date) rwsMsg('Pas de date de sortie lue sur la page : mets-la ci-dessus.');
   } catch (e) {
