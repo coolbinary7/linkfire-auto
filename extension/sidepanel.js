@@ -186,28 +186,37 @@ $('#xlsFile').addEventListener('change', async (e) => {
     const raw = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
     const txt = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
     // repérer la ligne d'en-tête et les colonnes
-    let col = { artists: 0, title: 1, upc: 2, date: 3 }, start = 0;
+    let col = { artists: 0, title: 1, upc: 2, date: 3, feats: -1, project: -1 }, start = 0;
     const hi = raw.findIndex(r => r.some(c => /artist/i.test(c)) && r.some(c => /titre|title/i.test(c)));
     if (hi >= 0) {
       const h = raw[hi].map(c => String(c).toLowerCase());
       const find = (re, d) => { const i = h.findIndex(c => re.test(c)); return i >= 0 ? i : d; };
       col = {
-        artists: find(/artist/, 0),
-        title: find(/titre|title|track/, 1),
-        upc: find(/upc|ean|barcode|code/, 2),
-        date: find(/date|sortie|release/, 3)
+        artists: find(/artiste principal|main artist/, find(/artist/, 0)),
+        feats: find(/featuring|feat|invit/, -1),
+        title: find(/^titre$|^title$/, find(/titre|title|track/, 1)),
+        project: find(/projet|album|ep\b/, -1),
+        upc: find(/upc|ean|barcode/, 2),
+        date: find(/date/, find(/sortie|release/, 3))
       };
       start = hi + 1;
     }
-    const recs = [];
+    const recs = [], seen = new Set();
     for (let i = start; i < raw.length; i++) {
       const r = raw[i], t = txt[i] || [];
-      recs.push({
-        artists: String(r[col.artists] || '').trim(),
-        title: String(t[col.title] || r[col.title] || '').trim(),
+      const main = String(r[col.artists] || '').trim();
+      const feats = col.feats >= 0 ? String(r[col.feats] || '').trim() : '';
+      // modèle commun : un album = plusieurs lignes (un titre par ligne) → un seul lien, au nom du projet
+      const project = col.project >= 0 ? String(t[col.project] || r[col.project] || '').trim() : '';
+      const rec = {
+        artists: feats ? `${main}, ${feats}` : main,
+        title: project || String(t[col.title] || r[col.title] || '').trim(),
         upc: upcFromCell(r[col.upc], t[col.upc]),
         date: isoFromCell(r[col.date])
-      });
+      };
+      const key = (rec.upc || '') + '|' + rec.title.toLowerCase();
+      if (!rec.title || seen.has(key)) continue;
+      seen.add(key); recs.push(rec);
     }
     const added = addRecords(recs);
     $('#formMsg').textContent = added ? '' : 'Aucune sortie trouvée dans ce fichier.';

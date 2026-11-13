@@ -59,9 +59,9 @@
       </div>
       <aside class="side">
         <div class="side-label">Version actuelle</div>
-        <div class="ver">2.4.0</div>
-        <a class="btn p" href="./downloads/Auto-Release-2.4.0.zip">Télécharger l’extension</a>
-        <a class="btn s" href="./downloads/modele-sorties-linkfire.xlsx">Modèle Excel des sorties</a>
+        <div class="ver">2.5.0</div>
+        <a class="btn p" href="./downloads/Auto-Release-2.5.0.zip">Télécharger l’extension</a>
+        <a class="btn s" href="./downloads/modele-mise-en-ligne.xlsx" download>Modèle Excel commun</a>
         <a class="btn" style="background:#fff;border:1px solid var(--line);color:var(--ink)" href="#tuto">▶ Voir le tuto vidéo (1 min)</a>
         <p class="note">À installer sur un ordinateur où Linkfire est déjà accessible et connecté dans Chrome.</p>
       </aside>
@@ -73,6 +73,38 @@
       <div class="chaps"><button data-t="4">Installer<span>0:04</span></button><button data-t="14">Scanner RWS<span>0:14</span></button><button data-t="30">Lancer la création<span>0:30</span></button><button data-t="49">À retenir<span>0:49</span></button><a class="dl" href="./videos/tuto-linkfire-auto.mp4" download>Télécharger la vidéo</a></div>
     </div>
     <script>document.querySelectorAll('.chaps button').forEach(b=>b.addEventListener('click',()=>{const v=document.getElementById('tutoVid');v.currentTime=+b.dataset.t;v.play();}));</script>
+
+    <h2 id="format">Format commun : mail et tableau</h2>
+    <div class="card">
+      <p>Pour que les extensions lisent toutes les sorties de la même façon, tout le monde suit ce format. <b>Une info par ligne, sous la forme « Clé : valeur »</b>, noms séparés par des virgules, date en JJ/MM/AAAA.</p>
+      <pre id="mailModel" style="white-space:pre-wrap;background:#f5f5f4;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px">MISE EN LIGNE – ARTISTE PRINCIPAL – TITRE – SORTIE LE JJ/MM/AAAA
+
+Type de sortie : Single / Snippet / Album
+Date de sortie : JJ/MM/AAAA
+Artiste principal :
+Featuring :
+Titre :
+Version :
+Auteurs :
+Compositeurs :
+Producteurs :
+Mix / Master :
+Genre :
+Label :
+Territoire : Monde
+UPC : à générer
+ISRC : à générer
+Assets : (lien)</pre>
+      <button class="btn s" style="background:#fff;border:1px solid var(--line);color:var(--ink)" onclick="navigator.clipboard.writeText(document.getElementById('mailModel').innerText).then(()=>{this.textContent='Copié ✓'})">📋 Copier le modèle de mail</button>
+      <a class="btn s" style="background:#fff;border:1px solid var(--line);color:var(--ink)" href="./downloads/modele-mise-en-ligne.xlsx" download>Télécharger le modèle Excel</a>
+      <ul>
+        <li><b>Artiste principal</b> : un seul nom. Les invités vont dans <b>Featuring</b>.</li>
+        <li><b>Auteurs</b> : obligatoires pour R2 (Prénom Nom).</li>
+        <li><b>Snippet</b> : dans « ISRC », mets l’ISRC de la piste complète.</li>
+        <li><b>Tableau</b> : une ligne = un titre ; un album = plusieurs lignes avec le même UPC et le même « Projet ». Dans Auto R2 (Firefox), tu peux coller la ligne des titres + la ligne du morceau à la place du mail. Ici, importe-le dans la carte « Importer tes sorties » (un album = un seul lien, au nom du projet). Il s’ouvre aussi dans Google Sheets.</li>
+        <li>Un mail « à l’ancienne » (artistes en liste, « Beatmaker », nom de dossier « 20261212-ARTISTE - … : TITRE ») est encore compris, mais il manque souvent les auteurs : l’extension te le dit.</li>
+      </ul>
+    </div>
 
     <h2 id="expire">Nouveau dans la 2.4 : expirer une sortie</h2>
     <div class="card">
