@@ -505,6 +505,9 @@
       const sb = fieldBlock(/^scan using$/i);
       if (!sb) fail('« Scan using » introuvable.');
       const plainInputs = () => {
+        // nouvelle case Linkfire (nov. 2026) : <input class="scan-source-input__input" id="…__scan-source-input">
+        const direct = [...document.querySelectorAll('input.scan-source-input__input, input[id$="scan-source-input"]')].filter(visible);
+        if (direct.length) return direct;
         const b = fieldBlock(/^scan using$/i);
         return b ? [...b.container.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio])')]
           .filter(visible).filter(i => !i.closest('[class*="select" i]') && i.getAttribute('role') !== 'combobox' && i.getAttribute('aria-autocomplete') !== 'list') : [];
@@ -515,6 +518,8 @@
         if (!b) return false;
         const sel = b.container.querySelector('select');
         if (sel && sel.options[sel.selectedIndex] && /^\s*upc\s*$/i.test(sel.options[sel.selectedIndex].textContent)) return true;
+        const lab = document.querySelector('.scan-source-input__label');
+        if (lab && /^\s*upc\s*$/i.test(lab.textContent)) return true;
         return [...b.container.querySelectorAll('*')].some(e => !e.childElementCount && /^upc$/i.test(ownText(e)));
       };
       // 1) Cas Linkfire : une seule case, on tape le code et l'étiquette « None » devient « UPC » toute seule
