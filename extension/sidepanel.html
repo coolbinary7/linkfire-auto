@@ -70,6 +70,15 @@
     </details>
   </section>
 
+  <section class="card cws">
+    <h2>CWS <small>(cover)</small></h2>
+    <p class="hint">L’extension cherche l’UPC dans CWS, crée la ressource (« Add Resource ») et ouvre la zone de dépôt. Tu glisses la cover <b>TIFF carrée</b>, elle lance l’upload et attend la fin.</p>
+    <label>UPC <small>(repris de RWS)</small><input id="cUpc" inputmode="numeric"></label>
+    <button id="cGo" class="primary">🖼️ Préparer CWS</button>
+    <ol id="cSteps" class="rwssteps"></ol>
+    <span id="cMsg" class="msg"></span>
+  </section>
+
   <section class="card ait">
     <h2>AIT <small>(audio)</small></h2>
     <p class="hint">Ouvre AIT dans un onglet. L’extension crée le brouillon avec l’UPC lu sur RWS, attend tes fichiers audio, puis associe chaque fichier à la bonne piste (numéro « partie-01 » ↔ Snippet 1 / piste 1, titre, durée). Le <b>Submit Job</b> reste pour toi.</p>
@@ -131,6 +140,7 @@
   <script src="rwsauto.js"></script>
   <script src="pitch.js"></script>
   <script src="aitauto.js"></script>
+  <script src="cwsauto.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

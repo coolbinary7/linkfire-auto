@@ -480,6 +480,7 @@ async function readRelease(tab, { fill = true } = {}) {
   todo.push('• Rush delivery si sortie dans moins de 5 jours');
   $('#rwsSum').innerHTML = `<b>${i.artists || '?'} – ${i.title || '?'}</b><br>UPC ${i.upc} · ${i.type || 'type ?'}${snip ? ' (snippet)' : ''}<br>${todo.join('<br>')}`;
   $('#aUpc').value = i.upc || '';
+  $('#cUpc').value = i.upc || '';
   await loadTracks();
   return i;
 }
@@ -778,4 +779,68 @@ $('#expGo').addEventListener('click', async () => {
     msgIn('#expMsg', r.skipped ? `Déjà expirée au ${frDate(exp)} : rien changé.` : `Terminé ✓ ${i.artists} – ${i.title} expire le ${frDate(exp)}. Vérifie la page, puis clique toi-même « Publish Release ».`, true);
   } catch (e) { msgIn('#expMsg', 'Arrêt : ' + (e.message || e)); }
   finally { $('#expGo').disabled = false; rwsBusy = false; }
+});
+
+
+// ---------- CWS : la cover ----------
+async function cwsAll(tabId, step, o) {
+  const res = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, func: lfaCwsStep, args: [step, o || {}] });
+  return res.map(r => r.result || {}).filter(r => r.frame || r.ok !== undefined);
+}
+async function cwsGoto(tabId, url) {
+  await chrome.tabs.update(tabId, { url, active: true });
+  for (let i = 0; i < 60; i++) { await new Promise(r => setTimeout(r, 500)); if ((await chrome.tabs.get(tabId)).status === 'complete') break; }
+  await new Promise(r => setTimeout(r, 1500));
+}
+$('#cGo').addEventListener('click', async () => {
+  const upc = $('#cUpc').value.replace(/\D/g, '');
+  if (upc.length < 12) return msgIn('#cMsg', 'Indique l’UPC (ou affiche d’abord la sortie dans la carte RWS).');
+  const ol = $('#cSteps'); ol.innerHTML = '';
+  const step = (t) => { const li = document.createElement('li'); li.className = 'run'; li.textContent = t + ' …'; ol.appendChild(li); return { ok: (x) => { li.className = 'ok'; li.textContent = t + (x ? ' : ' + x : ' ✓'); }, ko: () => { li.className = 'ko'; li.textContent = t + ' ✗'; } }; };
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  $('#cGo').disabled = true; msgIn('#cMsg', '');
+  try {
+    let [tab] = await chrome.tabs.query({ url: 'https://graphics.cws.umgapps.com/*' });
+    if (!tab) tab = await chrome.tabs.create({ url: 'about:blank', active: true });
+    let s = step(`Recherche de l’UPC ${upc} dans CWS`);
+    await cwsGoto(tab.id, 'https://graphics.cws.umgapps.com/search?q=' + upc);
+    const where = async () => (await cwsAll(tab.id, 'where')).find(r => r.frame === 'cws') || {};
+    let w = await where();
+    if (w.page !== 'resource') {
+      const r = ((await cwsAll(tab.id, 'search', { upc })).find(x => x.href || x.clicked || x.error)) || {};
+      if (r.error) { s.ko(); return msgIn('#cMsg', 'Arrêt : ' + r.error); }
+      if (r.href) await cwsGoto(tab.id, r.href);
+      for (let i = 0; i < 40 && (w = await where()).page !== 'resource'; i++) await wait(500);
+      if (w.page !== 'resource') { s.ko(); return msgIn('#cMsg', 'Arrêt : la page de la ressource CWS ne s’ouvre pas. Clique « Add Resource » à la main, puis relance.'); }
+      s.ok(r.existing ? 'ressource déjà créée' : 'ressource créée');
+    } else s.ok('ressource ouverte');
+    if (!w.noFiles) {
+      msgIn('#cMsg', `Une cover est déjà déposée sur ${w.head || 'cette ressource'} : rien à faire.`, true);
+      return;
+    }
+    s = step('Cover TIFF');
+    msgIn('#cMsg', 'Glisse la cover (TIFF carré) dans la zone « Drop your files here » de CWS. Je lance l’upload tout seul.', true);
+    const t0 = Date.now();
+    let up;
+    for (;;) {
+      up = (await cwsAll(tab.id, 'where')).find(r => r.frame === 'upload');
+      if (up && up.ready) break;
+      if (Date.now() - t0 > 15 * 60e3) { s.ko(); return msgIn('#cMsg', 'Pas de fichier reçu après 15 min : relance quand tu es prêt.'); }
+      await wait(1500);
+    }
+    await wait(800);
+    const u = (await cwsAll(tab.id, 'upload')).find(r => r.files || r.error) || {};
+    if (!u.ok) { s.ko(); return msgIn('#cMsg', 'Arrêt : ' + (u.error || 'upload impossible')); }
+    s.ok((u.files || []).join(', ') || 'fichier reçu');
+    s = step('Upload');
+    for (let i = 0; i < 300; i++) {
+      up = (await cwsAll(tab.id, 'where')).find(r => r.frame === 'upload');
+      if (up && up.complete) break;
+      await wait(2000);
+    }
+    if (!(up && up.complete)) { s.ko(); return msgIn('#cMsg', 'L’upload ne se termine pas : regarde la page CWS.'); }
+    s.ok('terminé');
+    msgIn('#cMsg', 'Terminé ✓ Cover envoyée dans CWS. Recharge la page de la ressource pour voir le fichier.', true);
+  } catch (e) { msgIn('#cMsg', 'Arrêt : ' + (e.message || e)); }
+  finally { $('#cGo').disabled = false; }
 });
