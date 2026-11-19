@@ -197,5 +197,42 @@ Assets : (lien)</pre>
 
     <footer>Outil interne non officiel, non affilié à Linkfire.</footer>
   </main>
+<style>
+.copybox{display:flex;align-items:center;gap:8px;margin:6px 0;padding:6px 6px 6px 12px;background:#0f172a;color:#e2e8f0;border-radius:10px;font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;max-width:100%}
+.copybox span{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;user-select:all}
+.copybox button{flex:none;border:0;border-radius:7px;padding:6px 12px;font:600 12px system-ui,sans-serif;background:#fff;color:#0f172a;cursor:pointer}
+.copybox button.ok{background:#22c55e;color:#fff}
+pre.copyable{position:relative}
+pre.copyable>button{position:absolute;top:8px;right:8px;border:0;border-radius:7px;padding:6px 12px;font:600 12px system-ui,sans-serif;background:#0f172a;color:#fff;cursor:pointer}
+</style>
+<script>
+(function(){
+  function copy(text,btn){
+    const done=()=>{const t=btn.textContent;btn.textContent='Copié ✓';btn.classList.add('ok');setTimeout(()=>{btn.textContent=t;btn.classList.remove('ok')},1500)};
+    if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(done,()=>fallback())}else fallback();
+    function fallback(){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){}ta.remove()}
+  }
+  // adresses à taper dans la barre d'adresse (about:, chrome://, liens) → zone de code + bouton Copier
+  document.querySelectorAll('code').forEach(function(c){
+    const t=c.textContent.trim();
+    if(!/^(about:|chrome:\/\/|https?:\/\/)/.test(t)||c.closest('pre,.copybox'))return;
+    const box=document.createElement('span');box.className='copybox';
+    const s=document.createElement('span');s.textContent=t;
+    const b=document.createElement('button');b.type='button';b.textContent='Copier';b.onclick=function(){copy(t,b)};
+    box.append(s,b);
+    // en bloc sur sa propre ligne
+    box.style.display='flex';
+    c.replaceWith(box);
+  });
+  // blocs de texte (modèle de mail…) : bouton Copier en haut à droite
+  document.querySelectorAll('pre').forEach(function(p){
+    if(p.querySelector('button'))return;
+    p.classList.add('copyable');
+    const b=document.createElement('button');b.type='button';b.textContent='Copier';
+    b.onclick=function(){copy(p.innerText.replace(/Copier$|Copié ✓$/,'').trim(),b)};
+    p.appendChild(b);
+  });
+})();
+</script>
 </body>
 </html>
