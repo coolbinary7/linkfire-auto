@@ -257,6 +257,46 @@ async function lfaRwsStep(step, opts) {
       return { ok: true, log };
     }
 
+    // ---- Ressource (Resource Workspace) : ISRC vidéo — enregistrement de Ced du 23/11/2026 ----
+    // /resources/<ISRC> → Manage Resource : edit → Release Date(s) : add → date + add all countries → add → save → Confirm Market Scope
+    if (step === 'resInfo' || step === 'resDates') {
+      const isrc = ((location.pathname.match(/resources\/([A-Z]{2}[A-Z0-9]{3}\d{7})/i) || [])[1] || '').toUpperCase();
+      const mrs = [...document.querySelectorAll('section.manage-resource, section.expandManage, section.expandable-section')]
+        .find(x => { const h = x.querySelector('header'); return h && /manage resource/i.test(h.innerText); }) || null;
+      const heads = [...document.querySelectorAll('header.pageHeader h1, header.pageHeader h2, header.pageHeader h3')].map(h => h.innerText.trim()).filter(Boolean);
+      const dateRows = (sec) => { const a = sec && article(sec, 'Release Date(s)'); return a ? [...a.querySelectorAll('table tbody tr')].filter(tr => vis(tr) && !tr.closest('form') && /\d{2}-[A-Za-z]{3}-\d{4}/.test(tr.innerText)) : []; };
+      const cnt = mrs ? +(((mrs.querySelector('header') || mrs).innerText.match(/Countries\s*\((\d+)\)/i) || [])[1] || 0) : 0;
+      const sc = document.querySelector('button.confirm-market-scope');
+      const info = { ok: !!isrc && !!mrs, isrc, artists: heads[0] || '', title: heads[1] || '', countries: cnt, hasDates: cnt > 0 || dateRows(mrs).length > 0, scopeDone: !!sc && /confirmed/i.test(sc.innerText) };
+      if (step === 'resInfo') return { ok: true, info, log };
+      if (!mrs) throw new Error('section « Manage Resource » introuvable (la page de la ressource est-elle chargée ?)');
+      await expand(mrs);
+      if (dateRows(mrs).length || info.countries > 0) { say('Date et pays déjà en place sur la ressource : rien à faire.'); return { ok: true, skipped: true, log }; }
+      const iso = opts.date;
+      if (!iso) throw new Error('date de sortie de la vidéo inconnue');
+      await openEdit(mrs, 'Manage Resource');
+      const art = await until(() => article(mrs, 'Release Date(s)'), 5000);
+      if (!art) throw new Error('bloc « Release Date(s) » introuvable');
+      if (!art.querySelector('form table tbody tr')) {
+        const addBtn = byText(art, 'button', 'add');
+        if (!addBtn) throw new Error('bouton « add » de Release Date(s) introuvable');
+        click(addBtn);
+        if (!await until(() => art.querySelector('form table tbody tr'), 5000)) throw new Error('le formulaire de date ne s’ouvre pas');
+      }
+      const row = formRow(art);
+      const cells = row.querySelectorAll(':scope > td');
+      if (!await pickDate(cells[0], iso)) say('⚠️ date à vérifier');
+      const all = addAll(cells[2] || row);
+      if (!all) throw new Error('lien « add all countries » introuvable');
+      click(all); await sleep(400);
+      const add = byText(cells[3] || row, 'button', 'add');
+      if (!add) throw new Error('bouton « add » de la date introuvable');
+      click(add); await sleep(600);
+      await saveSection(mrs, 'Manage Resource');
+      say(`Ressource ${isrc} : date ${fmt(iso)} + tous les pays enregistrés.`);
+      return { ok: true, log };
+    }
+
     if (step === 'scope') {
       const b = document.querySelector('button.confirm-market-scope');
       if (!b) throw new Error('bouton « Confirm Market Scope » introuvable');

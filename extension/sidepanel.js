@@ -490,13 +490,20 @@ function isSnippet() {
   if (t !== 'auto') return false;
   return !!(rwsInfo && rwsInfo.snippet);
 }
-$('#rwsType').addEventListener('change', () => { if (rwsInfo) readRelease({ id: rwsTabId }, { fill: false }).catch(() => {}); });
+$('#rwsType').addEventListener('change', () => { syncUpcLabel(); if ($('#rwsType').value === 'video') return; if (rwsInfo) readRelease({ id: rwsTabId }, { fill: false }).catch(() => {}); });
 $('#rwsUpc').addEventListener('input', () => { rwsFilledFrom = ''; $('#rwsSum').innerHTML = ''; });
 
 // lecture automatique quand tu affiches une sortie dans RWS
 async function autoRead() {
   if (rwsBusy) return;
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const isrcTab = isrcOf(tab && tab.url);
+  if (isrcTab) {
+    if ($('#rwsUpc').value && !rwsFilledFrom && rwsKey() !== isrcTab) return;
+    await new Promise(r => setTimeout(r, 1500));
+    try { rwsTabId = tab.id; const r = await rwsRun('resInfo'); if (r.ok && r.info.ok) { $('#rwsUpc').value = isrcTab; rwsFilledFrom = isrcTab; $('#rwsType').value = 'video'; syncUpcLabel(); resSummary(r.info); $('#rwsSteps').innerHTML = ''; rwsMsg(''); } } catch (e) {}
+    return;
+  }
   const upc = upcOf(tab && tab.url);
   if (!upc || (rwsInfo && sameUpc(rwsInfo.upc, upc) && rwsTabId === tab.id)) return;
   if ($('#rwsUpc').value && !rwsFilledFrom && !sameUpc($('#rwsUpc').value, upc)) return; // UPC tapé à la main : on n'écrase pas
@@ -534,7 +541,64 @@ async function openRelease(upc) {
   return tab;
 }
 
+// ---- ISRC vidéo : la ressource dans le Resource Workspace ----
+const ISRC_RE = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
+const isrcOf = (url) => (((url || '').match(/apps\.rws\.umusic\.net\/resources\/([A-Za-z]{2}[A-Za-z0-9]{3}\d{7})/) || [])[1] || '').toUpperCase();
+function rwsKey() { return $('#rwsUpc').value.replace(/[^A-Za-z0-9]/g, '').toUpperCase(); }
+function syncUpcLabel() { const k = rwsKey(); const vid = ISRC_RE.test(k) || $('#rwsType').value === 'video'; $('#rwsUpcLab').textContent = vid ? 'ISRC vidéo' : 'UPC'; if (ISRC_RE.test(k) && $('#rwsType').value !== 'video') $('#rwsType').value = 'video'; }
+$('#rwsUpc').addEventListener('input', syncUpcLabel);
+async function openResource(isrc) {
+  const all = await chrome.tabs.query({ url: 'https://apps.rws.umusic.net/*' });
+  let tab = all.find(t => isrcOf(t.url) === isrc);
+  const url = 'https://apps.rws.umusic.net/resources/' + isrc;
+  if (!tab) {
+    const [act] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    tab = act && /apps\.rws\.umusic\.net/.test(act.url || '') ? act : (all[0] || null);
+    if (tab) await chrome.tabs.update(tab.id, { url, active: true });
+    else tab = await chrome.tabs.create({ url, active: true });
+  } else await chrome.tabs.update(tab.id, { active: true });
+  rwsTabId = tab.id;
+  let info = null;
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    try { const r = await rwsRun('resInfo'); if (r.ok && r.info.ok && r.info.isrc === isrc) { info = r.info; break; } } catch (e) {}
+  }
+  if (!info) throw new Error(`la ressource ${isrc} ne s’affiche pas dans RWS (ISRC pas encore arrivé dans RWS ?)`);
+  return info;
+}
+function resSummary(i) {
+  $('#rwsSum').innerHTML = `<b>${i.artists || '?'} – ${i.title || '?'}</b><br>Ressource ${i.isrc} (vidéo)<br>${[i.hasDates ? '✓ date et pays déjà faits' : '• date + tous les pays (Manage Resource)', i.scopeDone ? '✓ market scope déjà confirmé' : '• Confirm Market Scope'].join('<br>')}`;
+}
+async function runResource(isrc) {
+  rwsMsg('Ouverture de la ressource ' + isrc + ' dans RWS…', true);
+  let i = await openResource(isrc);
+  resSummary(i);
+  const date = $('#rwsDate').value;
+  if (!date && !i.hasDates) return rwsMsg('Indique la date de sortie de la vidéo.');
+  rwsMsg('');
+  const steps = [['resDates', `Manage Resource : date ${frDate(date)} + tous les pays`], ['scope', 'Confirm Market Scope']];
+  const ol = $('#rwsSteps');
+  const lis = steps.map(([, t]) => { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); return li; });
+  for (let k = 0; k < steps.length; k++) {
+    lis[k].className = 'run'; lis[k].textContent = steps[k][1] + ' …';
+    const r = await rwsRun(steps[k][0], { date });
+    if (!r.ok) { lis[k].className = 'ko'; lis[k].textContent = steps[k][1] + ' ✗'; return rwsMsg(`Arrêt : ${r.error}. Fais cette étape à la main dans RWS, puis relance : ce qui est déjà fait sera sauté.`); }
+    lis[k].className = r.skipped ? 'skip' : 'ok';
+    lis[k].textContent = steps[k][1] + (r.skipped ? ' (déjà fait)' : ' ✓');
+  }
+  const r2 = await rwsRun('resInfo'); if (r2.ok) resSummary(r2.info);
+  rwsMsg(`Terminé ✓ ${i.artists} – ${i.title} (${isrc}) : vérifie la page, puis clique toi-même « Publish Resource ».`, true);
+}
+
 $('#rwsGo').addEventListener('click', async () => {
+  if (ISRC_RE.test(rwsKey()) || $('#rwsType').value === 'video') {
+    const isrc = rwsKey();
+    if (!ISRC_RE.test(isrc)) return rwsMsg('Indique l’ISRC de la vidéo (12 caractères, ex. GB2DY2614649).');
+    $('#rwsGo').disabled = true; rwsBusy = true; rwsMsg(''); $('#rwsSteps').innerHTML = '';
+    try { await runResource(isrc); } catch (e) { rwsMsg('Arrêt : ' + (e.message || e)); }
+    finally { $('#rwsGo').disabled = false; rwsBusy = false; }
+    return;
+  }
   const upc = $('#rwsUpc').value.replace(/\D/g, '');
   if (upc.length < 12) return rwsMsg('Indique l’UPC de la sortie (12 à 14 chiffres).');
   $('#rwsGo').disabled = true; rwsBusy = true; rwsMsg(''); $('#rwsSteps').innerHTML = '';
@@ -569,7 +633,7 @@ $('#rwsGo').addEventListener('click', async () => {
     await readRelease(tab, { fill: false }).catch(() => {});
     rwsMsg(`Terminé ✓ ${i.artists} – ${i.title} : vérifie la page, puis clique toi-même « Publish Release ».`, true);
   } catch (e) { rwsMsg('Arrêt : ' + (e.message || e)); }
-  finally { $('#rwsGo').disabled = false; }
+  finally { $('#rwsGo').disabled = false; rwsBusy = false; }
 });
 
 

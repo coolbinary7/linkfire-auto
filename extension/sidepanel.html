@@ -23,9 +23,9 @@
     <h2>Préparer la sortie dans RWS</h2>
     <p class="hint">Donne l’UPC, la date et le type : l’extension ouvre la sortie dans RWS et fait dates + tous les pays, Post Release (snippet), Confirm Market Scope, Rush delivery. Le <b>Publish Release</b> reste pour toi. Si la sortie est déjà ouverte dans RWS, les champs se remplissent tout seuls.</p>
     <div class="grid2">
-      <label>UPC<input id="rwsUpc" inputmode="numeric" placeholder="00881061927372"></label>
+      <label><span id="rwsUpcLab">UPC</span> <small>(ou l’ISRC d’une vidéo)</small><input id="rwsUpc" placeholder="00881061927372 ou GB2DY2614649"></label>
       <label>Date de sortie<input id="rwsDate" type="date"></label>
-      <label>Type de sortie<select id="rwsType"><option value="auto">Lu sur RWS</option><option value="snippet">Snippet (eSnippet Audio)</option><option value="single">Single (eSingle Audio)</option><option value="album">Album / EP</option></select></label>
+      <label>Type de sortie<select id="rwsType"><option value="auto">Lu sur RWS</option><option value="snippet">Snippet (eSnippet Audio)</option><option value="single">Single (eSingle Audio)</option><option value="album">Album / EP</option><option value="video">ISRC vidéo (ressource)</option></select></label>
       <label class="chk"><input id="rwsRush" type="checkbox"> Rush delivery <small id="rwsRushHint"></small></label>
     </div>
     <div id="rwsSum" class="rwssum"></div>
