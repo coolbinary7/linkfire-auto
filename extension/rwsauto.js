@@ -345,7 +345,21 @@ async function lfaRwsStep(step, opts) {
       const row = Object.values(rows).sort((a, b2) => b2.length - a.length)[0] || [];
       const labels = [...head2.querySelectorAll('*')].filter(e => zone(e) && !e.children.length && NAME_RE.test(textOf(e)));
       const cx = (r) => r.left + r.width / 2;
-      if (row.length >= 3) {
+      // structure réelle de RWS (diagnostic de Ced du 24/11) : table .header-milestones,
+      // libellés dans thead td.milestone-label, voyants td.release-milestone > … > div.done quand c'est vert
+      const realTds = [...document.querySelectorAll('.header-milestones td.release-milestone, td.release-milestone, td.resource-milestone')];
+      if (realTds.length) {
+        const labs = [...document.querySelectorAll('.header-milestones td.milestone-label, td.milestone-label')].map(td => td.textContent.trim());
+        realTds.forEach((td, k) => {
+          const ind = td.querySelector('.release-milestone-indicator, .resource-milestone-indicator, .outer') || td;
+          const inner = ind.querySelector('div') || ind;
+          const cls = (inner.getAttribute('class') || '').trim();
+          const done = /(^|\s)done(\s|$)/.test(cls);
+          const name = labs[k] || (td.getAttribute('selenium-id') || `voyant ${k + 1}`).replace(/(Release|Resource)Milestone$/, '');
+          const tip = (td.querySelector('.milestone-tooltip-message') || {}).textContent || '';
+          lights.push({ name, state: done ? 'green' : (/error|fail|reject/i.test(cls) ? 'red' : 'grey'), why: (cls || 'vide') + (tip ? ' · ' + tip.trim() : '') });
+        });
+      } else if (row.length >= 3) {
         row.sort((a, b2) => a.r.left - b2.r.left);
         for (const d of row) {
           const lab = labels.map(e => ({ e, r: e.getBoundingClientRect() })).sort((a, b2) => Math.abs(cx(a.r) - cx(d.r)) - Math.abs(cx(b2.r) - cx(d.r)))[0];
@@ -363,11 +377,14 @@ async function lfaRwsStep(step, opts) {
       }
       const pub = document.querySelector('button.publish-release, button.publish-resource');
       const st = document.querySelector('.rws-status');
-      const stCls = st ? st.className : '';
-      const published = /(^|\s)(Published|Live|Delivered)(\s|$)/.test(stCls) && !/Unpublished/.test(stCls);
+      const stTxt = ((document.querySelector('[selenium-id="rws-status"]') || {}).textContent || '').trim();
+      const stCls = (st ? st.className.replace('rws-status', '').trim() : '') + (stTxt ? ' ' + stTxt : '');
+      const statusOf = () => (((document.querySelector('[selenium-id="rws-status"]') || {}).textContent || '') + ' ' + ((document.querySelector('.rws-status') || {}).className || '')).trim();
+      const isPub = (t) => /(^|\s)(Published|Live|Delivered|Publishing|Pending Delivery|Scheduled)(\s|$)/i.test(t) && !/unpublished/i.test(t);
+      const published = isPub(stCls);
       const allGreen = lights.length >= 4 && lights.every(l => l.state === 'green');
       const boxHtml = [...document.querySelectorAll('div.milestones-and-publish')].map(x => x.outerHTML).join('\n').slice(0, 8000);
-      const info = { lights, allGreen, published, status: stCls.replace('rws-status', '').trim(), canPublish: !!pub && !pub.classList.contains('disabled') && !pub.disabled, key: (location.pathname.match(/(releases|resources)\/([A-Z0-9]+)/i) || [])[2] || '', kind: /resources\//.test(location.pathname) ? 'resource' : 'release', title: [...document.querySelectorAll('header.pageHeader h1, header.pageHeader h2')].map(h => h.innerText.trim()).filter(Boolean).slice(0, 2).join(' – ') || document.title, html: boxHtml };
+      const info = { lights, allGreen, published, status: stCls.trim(), canPublish: !!pub && !pub.classList.contains('disabled') && !pub.disabled, key: (location.pathname.match(/(releases|resources)\/([A-Z0-9]+)/i) || [])[2] || '', kind: /resources\//.test(location.pathname) ? 'resource' : 'release', title: [...document.querySelectorAll('header.pageHeader h1, header.pageHeader h2')].map(h => h.innerText.trim()).filter(Boolean).slice(0, 2).join(' – ') || document.title, html: boxHtml };
       if (step === 'lights') return { ok: true, info, log };
       // publish : seulement si tout est vert (re-vérifié ici, au moment du clic)
       if (published) { say('Déjà publiée.'); return { ok: true, skipped: true, info, log }; }
@@ -378,8 +395,8 @@ async function lfaRwsStep(step, opts) {
       // fenêtre de confirmation éventuelle
       const conf = await until(() => [...document.querySelectorAll('.overlay button, .modal button, [role=dialog] button, .overlay-footer button')].find(b => vis(b) && /^(publish( release| resource)?|confirm|yes|ok|continue|oui)$/i.test(b.innerText.trim())), 4000);
       if (conf) { say('Confirmation : ' + conf.innerText.trim()); click(conf); }
-      const okPub = await until(() => { const s2 = document.querySelector('.rws-status'); return s2 && !/Unpublished/.test(s2.className) ? s2 : null; }, 30000);
-      say(okPub ? 'Publish cliqué : statut ' + okPub.className.replace('rws-status', '').trim() : 'Publish cliqué (statut pas encore mis à jour)');
+      const okPub = await until(() => { const t = statusOf(); return t && !/unpublished/i.test(t) ? t : null; }, 30000);
+      say(okPub ? 'Publish cliqué : statut ' + okPub.replace('rws-status', '').trim() : 'Publish cliqué (statut pas encore mis à jour)');
       return { ok: true, info, published: !!okPub, log };
     }
 
