@@ -347,9 +347,12 @@ async function lfaRwsStep(step, opts) {
       const cx = (r) => r.left + r.width / 2;
       // structure réelle de RWS (diagnostic de Ced du 24/11) : table .header-milestones,
       // libellés dans thead td.milestone-label, voyants td.release-milestone > … > div.done quand c'est vert
-      const realTds = [...document.querySelectorAll('.header-milestones td.release-milestone, td.release-milestone, td.resource-milestone')];
+      // seulement les voyants du haut de page (la table des pistes plus bas a aussi des voyants par piste)
+      let realTds = [...document.querySelectorAll('.header-milestones td.release-milestone, .header-milestones td.resource-milestone')];
+      if (!realTds.length) realTds = [...document.querySelectorAll('header.pageHeader td.release-milestone, header.pageHeader td.resource-milestone')];
+      if (!realTds.length) realTds = [...document.querySelectorAll('td.release-milestone, td.resource-milestone')].filter(td => !/Track/i.test(td.getAttribute('selenium-id') || ''));
       if (realTds.length) {
-        const labs = [...document.querySelectorAll('.header-milestones td.milestone-label, td.milestone-label')].map(td => td.textContent.trim());
+        const labs = [...(realTds[0] && realTds[0].closest('table') || document).querySelectorAll('td.milestone-label')].map(td => td.textContent.trim());
         realTds.forEach((td, k) => {
           const ind = td.querySelector('.release-milestone-indicator, .resource-milestone-indicator, .outer') || td;
           const inner = ind.querySelector('div') || ind;
