@@ -308,32 +308,50 @@ async function lfaRwsStep(step, opts) {
       const kind = (c) => { if (!c) return ''; const [r, g, b2] = c; if (g > 100 && g > r + 30 && g >= b2) return 'green'; if (r > 150 && r > g + 50) return 'red'; if (r > 180 && g > 120 && b2 < 90) return 'orange'; return 'grey'; };
       const colorOf = (e) => {
         if (!e) return '';
+        if (e.tagName === 'IMG') { const k = (e.getAttribute('src') || '') + ' ' + (e.getAttribute('alt') || '') + ' ' + (e.getAttribute('class') || ''); return /green|complete|success|check|done|ok\b/i.test(k) ? 'green' : /red|error|fail/i.test(k) ? 'red' : /grey|gray|incomplete|pending|empty/i.test(k) ? 'grey' : ''; }
+        const cls = (e.getAttribute && e.getAttribute('class')) || '';
+        if (/(^|[\s_-])(complete[d]?|success|green|done|valid)($|[\s_-])/i.test(cls) && !/incomplete/i.test(cls)) return 'green';
+        if (/(^|[\s_-])(incomplete|pending|grey|gray|missing|todo)($|[\s_-])/i.test(cls)) return 'grey';
         const cs = getComputedStyle(e);
         const vals = /^(circle|ellipse|path|rect|svg)$/i.test(e.tagName) ? [e.getAttribute('fill'), cs.fill, cs.stroke, cs.color] : [cs.backgroundColor, cs.borderTopColor, e.getAttribute('fill'), cs.color];
         for (const v of vals) { const k = kind(rgbOf(v) || hexRgb(v)); if (k) return k; }
         return '';
       };
       const lights = [];
-      if (box) {
-        const zone = (e) => !e.closest('button, a, .publish, .rws-status');
-        // ronds : cercles SVG, ou petits éléments ronds/colorés sans texte
-        let dots = [...box.querySelectorAll('circle, ellipse')].filter(zone);
-        if (!dots.length) dots = [...box.querySelectorAll('*')].filter(e => {
-          if (!zone(e) || e.children.length || e.textContent.trim()) return false;
-          const r = e.getBoundingClientRect(); if (r.width < 4 || r.height < 4 || r.width > 26 || r.height > 26) return false;
-          const cs = getComputedStyle(e); return parseFloat(cs.borderTopLeftRadius) >= r.width / 3 || e.tagName === 'svg' || /dot|circle|status|milestone|indicator|light/i.test(e.getAttribute('class') || '');
-        });
-        dots = dots.filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
-        // libellés : textes courts (y compris <text> SVG)
-        const labels = [...box.querySelectorAll('*')].filter(e => zone(e) && !e.children.length && /^(label\s*copy|rights|market\s*scope|assets|pricing|clearance|metadata|label copy)$/i.test(e.textContent.trim()));
-        const cx = (e) => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; };
-        dots.sort((a, b2) => cx(a) - cx(b2));
-        for (const d of dots) {
-          const lab = labels.slice().sort((a, b2) => Math.abs(cx(a) - cx(d)) - Math.abs(cx(b2) - cx(d)))[0];
-          const name = lab && Math.abs(cx(lab) - cx(d)) < 60 ? lab.textContent.trim() : `voyant ${lights.length + 1}`;
-          if (lights.some(l => l.name === name)) continue;
-          const st = colorOf(d) || colorOf(d.parentElement) || '?';
-          lights.push({ name, state: st === 'orange' ? 'red' : st, why: (d.getAttribute('class') || d.tagName).toString().slice(0, 40) });
+      const head2 = document.querySelector('header.pageHeader') || box || document.body;
+      const zone = (e) => !e.closest('button, a, .rws-status, input, select, textarea');
+      const textOf = (e) => {
+        let t = (e.textContent || '').trim();
+        if (!t) t = (e.getAttribute && (e.getAttribute('title') || e.getAttribute('aria-label') || e.getAttribute('data-original-title') || e.getAttribute('data-tip') || e.getAttribute('alt'))) || '';
+        if (!t) for (const ps of ['::before', '::after']) { const c = getComputedStyle(e, ps).content; if (c && c !== 'none' && c !== 'normal' && c.length > 2) { t = c.replace(/^["']|["']$/g, ''); break; } }
+        return t.trim();
+      };
+      const NAME_RE = /^(label\s*copy|rights|market\s*scope|assets|pricing|clearance|metadata)$/i;
+      // tous les petits ronds colorés du haut de page (hors boutons), regroupés par ligne
+      const cands = [...head2.querySelectorAll('*')].filter(e => {
+        if (!zone(e)) return false;
+        const r = e.getBoundingClientRect();
+        if (r.width < 4 || r.height < 4 || r.width > 26 || r.height > 26 || Math.abs(r.width - r.height) > 6) return false;
+        if (/^(circle|ellipse)$/i.test(e.tagName)) return true;
+        if (e.children.length && e.tagName.toLowerCase() !== 'svg') return false;
+        if ((e.textContent || '').trim().length > 1) return false;
+        const cs = getComputedStyle(e);
+        return parseFloat(cs.borderTopLeftRadius) >= r.width / 3 || /^(svg|i)$/i.test(e.tagName) || /dot|circle|status|milestone|indicator|light|bullet/i.test(e.getAttribute('class') || '');
+      }).map(e => ({ e, r: e.getBoundingClientRect(), c: colorOf(e) })).filter(x => x.c);
+      // un rond SVG et son <svg> parent : on garde le plus petit
+      const uniq = cands.filter(x => !cands.some(y => y !== x && x.e.contains(y.e)));
+      const rows = {};
+      for (const x of uniq) { const k = Math.round((x.r.top + x.r.height / 2) / 8); (rows[k] = rows[k] || []).push(x); }
+      const row = Object.values(rows).sort((a, b2) => b2.length - a.length)[0] || [];
+      const labels = [...head2.querySelectorAll('*')].filter(e => zone(e) && !e.children.length && NAME_RE.test(textOf(e)));
+      const cx = (r) => r.left + r.width / 2;
+      if (row.length >= 3) {
+        row.sort((a, b2) => a.r.left - b2.r.left);
+        for (const d of row) {
+          const lab = labels.map(e => ({ e, r: e.getBoundingClientRect() })).sort((a, b2) => Math.abs(cx(a.r) - cx(d.r)) - Math.abs(cx(b2.r) - cx(d.r)))[0];
+          let name = lab && Math.abs(cx(lab.r) - cx(d.r)) < 70 ? textOf(lab.e) : `voyant ${lights.length + 1}`;
+          if (lights.some(l => l.name === name)) name = `voyant ${lights.length + 1}`;
+          lights.push({ name, state: d.c === 'orange' ? 'red' : d.c, why: ((d.e.getAttribute('class') || '') + ' ' + d.e.tagName).trim().slice(0, 40) });
         }
       }
       // Market Scope : le bouton fait foi
