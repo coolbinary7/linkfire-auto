@@ -299,32 +299,57 @@ async function lfaRwsStep(step, opts) {
 
     // ---- Voyants (milestones) : Label Copy, Rights, Market Scope, Assets, Clearance ----
     if (step === 'lights' || step === 'publish') {
-      const NAMES = ['Label Copy', 'Rights', 'Market Scope', 'Assets', 'Clearance'];
-      const head = document.querySelector('header.pageHeader') || document.body;
-      const GREEN = /(^|[\s_-])(complete[d]?|success|green|done|valid|validated|ok|passed|confirmed|approved|cleared|checked)($|[\s_-])/i;
-      const RED = /(^|[\s_-])(incomplete|error|fail(ed)?|red|warn(ing)?|pending|missing|in-?progress|not-?(complete|started|confirmed)|grey|gray|disabled|todo|invalid)($|[\s_-])/i;
-      const colorOf = (el) => { for (const e of [el, ...el.querySelectorAll('*')].slice(0, 12)) { const cs = getComputedStyle(e); for (const v of [cs.backgroundColor, cs.color, cs.borderTopColor, cs.fill]) { const m = (v || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/); if (!m || m[4] === '0') continue; const [r, g, b2] = [+m[1], +m[2], +m[3]]; if (g > 110 && g > r + 40 && g > b2 + 20) return 'green'; if (r > 150 && r > g + 60) return 'red'; if (r > 180 && g > 120 && b2 < 90) return 'red'; } } return ''; };
+      // Voyants du haut de page : des petits ronds (vert / gris / rouge) sous des libellés inclinés
+      // (Label Copy, Rights, Market Scope, Assets, Pricing ou Clearance). On lit les ronds par position, de gauche à droite.
+      const box = [...document.querySelectorAll('header.pageHeader div.milestones-and-publish, div.milestones-and-publish')]
+        .find(x => /label\s*copy|rights|assets|pricing|clearance/i.test(x.textContent)) || null;
+      const rgbOf = (v) => { const m = (v || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/); if (!m || m[4] === '0') return null; return [+m[1], +m[2], +m[3]]; };
+      const hexRgb = (h) => { const m = (h || '').trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i); if (!m) return null; let x = m[1]; if (x.length === 3) x = x.split('').map(c => c + c).join(''); return [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2, 4), 16), parseInt(x.slice(4, 6), 16)]; };
+      const kind = (c) => { if (!c) return ''; const [r, g, b2] = c; if (g > 100 && g > r + 30 && g >= b2) return 'green'; if (r > 150 && r > g + 50) return 'red'; if (r > 180 && g > 120 && b2 < 90) return 'orange'; return 'grey'; };
+      const colorOf = (e) => {
+        if (!e) return '';
+        const cs = getComputedStyle(e);
+        const vals = /^(circle|ellipse|path|rect|svg)$/i.test(e.tagName) ? [e.getAttribute('fill'), cs.fill, cs.stroke, cs.color] : [cs.backgroundColor, cs.borderTopColor, e.getAttribute('fill'), cs.color];
+        for (const v of vals) { const k = kind(rgbOf(v) || hexRgb(v)); if (k) return k; }
+        return '';
+      };
       const lights = [];
-      for (const nm of NAMES) {
-        const cand = [...head.querySelectorAll('li, span, div, a, p, button')].filter(e => vis(e) && norm(e.innerText) === norm(nm) || (e.classList && e.classList.contains('confirm-market-scope') && nm === 'Market Scope'));
-        const el = cand.sort((x, y) => x.innerText.length - y.innerText.length)[0];
-        if (!el) continue;
-        let node = el, state = '', why = '';
-        for (let up = 0; up < 3 && node && !state; up++, node = node.parentElement) {
-          const cls = [node, ...node.querySelectorAll('*')].slice(0, 15).map(e => (typeof e.className === 'string' ? e.className : (e.getAttribute && e.getAttribute('class')) || '') + ' ' + (e.getAttribute && (e.getAttribute('title') || e.getAttribute('aria-label') || e.getAttribute('data-status')) || '')).join(' ');
-          if (RED.test(cls)) { state = 'red'; why = (cls.match(RED) || [])[0]; } else if (GREEN.test(cls)) { state = 'green'; why = (cls.match(GREEN) || [])[0]; }
-          if (!state && up === 0) { const c = colorOf(node); if (c) { state = c; why = 'couleur'; } }
+      if (box) {
+        const zone = (e) => !e.closest('button, a, .publish, .rws-status');
+        // ronds : cercles SVG, ou petits éléments ronds/colorés sans texte
+        let dots = [...box.querySelectorAll('circle, ellipse')].filter(zone);
+        if (!dots.length) dots = [...box.querySelectorAll('*')].filter(e => {
+          if (!zone(e) || e.children.length || e.textContent.trim()) return false;
+          const r = e.getBoundingClientRect(); if (r.width < 4 || r.height < 4 || r.width > 26 || r.height > 26) return false;
+          const cs = getComputedStyle(e); return parseFloat(cs.borderTopLeftRadius) >= r.width / 3 || e.tagName === 'svg' || /dot|circle|status|milestone|indicator|light/i.test(e.getAttribute('class') || '');
+        });
+        dots = dots.filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+        // libellés : textes courts (y compris <text> SVG)
+        const labels = [...box.querySelectorAll('*')].filter(e => zone(e) && !e.children.length && /^(label\s*copy|rights|market\s*scope|assets|pricing|clearance|metadata|label copy)$/i.test(e.textContent.trim()));
+        const cx = (e) => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; };
+        dots.sort((a, b2) => cx(a) - cx(b2));
+        for (const d of dots) {
+          const lab = labels.slice().sort((a, b2) => Math.abs(cx(a) - cx(d)) - Math.abs(cx(b2) - cx(d)))[0];
+          const name = lab && Math.abs(cx(lab) - cx(d)) < 60 ? lab.textContent.trim() : `voyant ${lights.length + 1}`;
+          if (lights.some(l => l.name === name)) continue;
+          const st = colorOf(d) || colorOf(d.parentElement) || '?';
+          lights.push({ name, state: st === 'orange' ? 'red' : st, why: (d.getAttribute('class') || d.tagName).toString().slice(0, 40) });
         }
-        if (nm === 'Market Scope') { const sc = document.querySelector('button.confirm-market-scope'); if (sc) { state = /confirmed/i.test(sc.innerText) ? 'green' : 'red'; why = sc.innerText.trim(); } }
-        lights.push({ name: nm, state: state || '?', why: String(why || '').trim() });
+      }
+      // Market Scope : le bouton fait foi
+      const sc = document.querySelector('button.confirm-market-scope');
+      if (sc) {
+        const ms = lights.find(l => /market\s*scope/i.test(l.name));
+        const st = /confirmed/i.test(sc.innerText) ? 'green' : 'red';
+        if (ms) { if (st === 'red') ms.state = 'red'; } else lights.push({ name: 'Market Scope', state: st, why: sc.innerText.trim() });
       }
       const pub = document.querySelector('button.publish-release, button.publish-resource');
       const st = document.querySelector('.rws-status');
       const stCls = st ? st.className : '';
       const published = /(^|\s)(Published|Live|Delivered)(\s|$)/.test(stCls) && !/Unpublished/.test(stCls);
       const allGreen = lights.length >= 4 && lights.every(l => l.state === 'green');
-      const box = [...document.querySelectorAll('div.milestones-and-publish')].map(x => x.outerHTML).join('\n').slice(0, 6000);
-      const info = { lights, allGreen, published, status: stCls.replace('rws-status', '').trim(), canPublish: !!pub && !pub.classList.contains('disabled') && !pub.disabled, key: (location.pathname.match(/(releases|resources)\/([A-Z0-9]+)/i) || [])[2] || '', kind: /resources\//.test(location.pathname) ? 'resource' : 'release', title: document.title, html: box };
+      const boxHtml = [...document.querySelectorAll('div.milestones-and-publish')].map(x => x.outerHTML).join('\n').slice(0, 8000);
+      const info = { lights, allGreen, published, status: stCls.replace('rws-status', '').trim(), canPublish: !!pub && !pub.classList.contains('disabled') && !pub.disabled, key: (location.pathname.match(/(releases|resources)\/([A-Z0-9]+)/i) || [])[2] || '', kind: /resources\//.test(location.pathname) ? 'resource' : 'release', title: [...document.querySelectorAll('header.pageHeader h1, header.pageHeader h2')].map(h => h.innerText.trim()).filter(Boolean).slice(0, 2).join(' – ') || document.title, html: boxHtml };
       if (step === 'lights') return { ok: true, info, log };
       // publish : seulement si tout est vert (re-vérifié ici, au moment du clic)
       if (published) { say('Déjà publiée.'); return { ok: true, skipped: true, info, log }; }
