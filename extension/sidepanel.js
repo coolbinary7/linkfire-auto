@@ -587,7 +587,8 @@ async function runResource(isrc) {
     lis[k].textContent = steps[k][1] + (r.skipped ? ' (déjà fait)' : ' ✓');
   }
   const r2 = await rwsRun('resInfo'); if (r2.ok) resSummary(r2.info);
-  rwsMsg(`Terminé ✓ ${i.artists} – ${i.title} (${isrc}) : vérifie la page, puis clique toi-même « Publish Resource ».`, true);
+  rwsMsg(`Terminé ✓ ${i.artists} – ${i.title} (${isrc}) : ${$('#wAuto').checked ? 'la surveillance des voyants démarre.' : 'vérifie la page, puis clique toi-même « Publish Resource ».'}`, true);
+  if ($('#wAuto').checked) await startWatch(rwsTabId, `${i.artists} – ${i.title}`).catch(e => msgIn('#wMsg', 'Surveillance : ' + (e.message || e)));
 }
 
 $('#rwsGo').addEventListener('click', async () => {
@@ -631,7 +632,8 @@ $('#rwsGo').addEventListener('click', async () => {
       lis[k].textContent = steps[k][1] + (r.skipped ? ' (déjà fait)' : ' ✓');
     }
     await readRelease(tab, { fill: false }).catch(() => {});
-    rwsMsg(`Terminé ✓ ${i.artists} – ${i.title} : vérifie la page, puis clique toi-même « Publish Release ».`, true);
+    rwsMsg(`Terminé ✓ ${i.artists} – ${i.title} : ${$('#wAuto').checked ? 'la surveillance des voyants démarre.' : 'vérifie la page, puis clique toi-même « Publish Release ».'}`, true);
+    if ($('#wAuto').checked) await startWatch(tab.id, `${i.artists} – ${i.title}`).catch(e => msgIn('#wMsg', 'Surveillance : ' + (e.message || e)));
   } catch (e) { rwsMsg('Arrêt : ' + (e.message || e)); }
   finally { $('#rwsGo').disabled = false; rwsBusy = false; }
 });
@@ -907,4 +909,64 @@ $('#cGo').addEventListener('click', async () => {
     msgIn('#cMsg', 'Terminé ✓ Cover envoyée dans CWS. Recharge la page de la ressource pour voir le fichier.', true);
   } catch (e) { msgIn('#cMsg', 'Arrêt : ' + (e.message || e)); }
   finally { $('#cGo').disabled = false; }
+});
+
+
+// ---------- Main levée RWS : surveillance des voyants ----------
+const WPREF = 'lfa-watch-prefs';
+const wAction = () => (document.querySelector('input[name=wAct]:checked') || {}).value || 'notify';
+(async () => {
+  const p = (await chrome.storage.local.get(WPREF))[WPREF] || {};
+  if (p.action) { const r = document.querySelector(`input[name=wAct][value=${p.action}]`); if (r) r.checked = true; }
+  if (p.auto === false) $('#wAuto').checked = false;
+  drawWatch();
+})();
+const saveWPref = () => chrome.storage.local.set({ [WPREF]: { action: wAction(), auto: $('#wAuto').checked } });
+document.querySelectorAll('input[name=wAct]').forEach(r => r.addEventListener('change', saveWPref));
+$('#wAuto').addEventListener('change', saveWPref);
+const wLights = (ls) => (ls || []).map(l => `${l.state === 'green' ? '🟢' : l.state === 'red' ? '🔴' : '⚪'} ${l.name}`).join(' · ');
+async function drawWatch() {
+  const list = (await chrome.storage.local.get('lfa-watch'))['lfa-watch'] || [];
+  const ul = $('#wList'); ul.innerHTML = '';
+  for (const w of list.slice().reverse()) {
+    const li = document.createElement('li');
+    const when = w.checked ? new Date(w.checked).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
+    li.innerHTML = `<b></b> · ${w.action === 'publish' ? 'publie seul' : 'notification'}<div class="l"></div><div class="l">État : ${w.state || '…'} (vérifié ${when})</div>`;
+    li.querySelector('b').textContent = w.label;
+    li.querySelectorAll('.l')[0].textContent = wLights(w.lights) || 'voyants pas encore lus';
+    const bt = document.createElement('button'); bt.className = 'ghost'; bt.textContent = w.done ? 'Retirer' : 'Arrêter';
+    bt.onclick = async () => { await chrome.runtime.sendMessage({ type: 'watchStop', key: w.key }); drawWatch(); };
+    li.appendChild(bt);
+    ul.appendChild(li);
+  }
+}
+chrome.storage.onChanged.addListener((ch) => { if (ch['lfa-watch']) drawWatch(); });
+async function startWatch(tabId, fallbackLabel) {
+  const [res] = await chrome.scripting.executeScript({ target: { tabId }, func: lfaRwsStep, args: ['lights', {}] });
+  const r = (res && res.result) || {};
+  if (!r.ok) throw new Error(r.error || 'page RWS illisible');
+  const i = r.info;
+  if (!i.key) throw new Error('ouvre la page d’une sortie ou d’une ressource RWS');
+  const label = fallbackLabel || (i.title || i.key);
+  await chrome.runtime.sendMessage({ type: 'watchStart', key: i.key, tabId, kind: i.kind, label: `${label} (${i.key})`, action: wAction() });
+  msgIn('#wMsg', `Surveillance lancée : ${wLights(i.lights) || 'voyants pas encore lus'}${i.lights.length ? '' : ' — si ça reste vide, clique « Diagnostic voyants » et envoie-le à Claude'}.`, true);
+  drawWatch();
+}
+$('#wGo').addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  let t = tab && /apps\.rws\.umusic\.net\/(releases|resources)\/[A-Za-z0-9]/.test(tab.url || '') ? tab : null;
+  if (!t) { const all = (await chrome.tabs.query({ url: 'https://apps.rws.umusic.net/*' })).filter(x => /\/(releases|resources)\/[A-Za-z0-9]/.test(x.url || '')); if (all.length === 1) t = all[0]; }
+  if (!t) return msgIn('#wMsg', 'Affiche d’abord la sortie (ou la ressource) dans RWS, puis clique à nouveau.');
+  try { await startWatch(t.id); } catch (e) { msgIn('#wMsg', 'Impossible : ' + (e.message || e)); }
+});
+$('#wDiag').addEventListener('click', async () => {
+  const all = (await chrome.tabs.query({ url: 'https://apps.rws.umusic.net/*' })).filter(x => /\/(releases|resources)\//.test(x.url || ''));
+  const [act] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const t = all.find(x => act && x.id === act.id) || all[0];
+  if (!t) return msgIn('#wMsg', 'Aucune sortie RWS ouverte.');
+  const [res] = await chrome.scripting.executeScript({ target: { tabId: t.id }, func: lfaRwsStep, args: ['lights', {}] });
+  const r = (res && res.result) || {};
+  const txt = 'Diagnostic voyants Auto Release\n' + JSON.stringify({ lights: r.info && r.info.lights, allGreen: r.info && r.info.allGreen, status: r.info && r.info.status, html: r.info && r.info.html }, null, 1);
+  await navigator.clipboard.writeText(txt).catch(() => {});
+  msgIn('#wMsg', 'Diagnostic copié : colle-le dans la conversation avec Claude (aucun mot de passe dedans).', true);
 });

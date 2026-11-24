@@ -33,6 +33,17 @@
     <button id="rwsRead" class="ghost" style="width:100%">🔎 Reprendre la sortie de l’onglet RWS ouvert</button>
     <ol id="rwsSteps" class="rwssteps"></ol>
     <span id="rwsMsg" class="msg"></span>
+    <div class="watchbox">
+      <b>👀 Main levée : surveiller les voyants</b>
+      <p class="hint">Quand Label Copy, Rights, Market Scope, Assets et Clearance sont tous verts :</p>
+      <label class="chk"><input type="radio" name="wAct" value="notify" checked> m’envoyer une notification « Je publie ? » (un clic pour publier)</label>
+      <label class="chk"><input type="radio" name="wAct" value="publish"> cliquer <b>Publish</b> tout seul</label>
+      <label class="chk"><input type="checkbox" id="wAuto" checked> lancer la surveillance tout de suite après « Préparer »</label>
+      <div class="row2"><button id="wGo">👀 Surveiller l’onglet RWS ouvert</button><button id="wDiag" class="ghost">📋 Diagnostic voyants</button></div>
+      <ul id="wList" class="wlist"></ul>
+      <span id="wMsg" class="msg"></span>
+      <p class="hint">Laisse Chrome et l’onglet RWS ouverts (par exemple sur ton 2ᵉ écran) et le PC allumé : l’extension recharge la page toutes les 3 minutes et vérifie chaque minute. Le panneau peut être fermé.</p>
+    </div>
     <details id="expBox" style="margin-top:10px">
       <summary><b>⛔ Expirer la sortie</b> (retrait des plateformes)</summary>
       <p class="hint">Pour l’UPC ci-dessus : Manage Release → date d’expiration sur chaque ligne « Release Date(s) » → save. Le <b>Publish Release</b> reste pour toi.</p>

@@ -297,6 +297,49 @@ async function lfaRwsStep(step, opts) {
       return { ok: true, log };
     }
 
+    // ---- Voyants (milestones) : Label Copy, Rights, Market Scope, Assets, Clearance ----
+    if (step === 'lights' || step === 'publish') {
+      const NAMES = ['Label Copy', 'Rights', 'Market Scope', 'Assets', 'Clearance'];
+      const head = document.querySelector('header.pageHeader') || document.body;
+      const GREEN = /(^|[\s_-])(complete[d]?|success|green|done|valid|validated|ok|passed|confirmed|approved|cleared|checked)($|[\s_-])/i;
+      const RED = /(^|[\s_-])(incomplete|error|fail(ed)?|red|warn(ing)?|pending|missing|in-?progress|not-?(complete|started|confirmed)|grey|gray|disabled|todo|invalid)($|[\s_-])/i;
+      const colorOf = (el) => { for (const e of [el, ...el.querySelectorAll('*')].slice(0, 12)) { const cs = getComputedStyle(e); for (const v of [cs.backgroundColor, cs.color, cs.borderTopColor, cs.fill]) { const m = (v || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/); if (!m || m[4] === '0') continue; const [r, g, b2] = [+m[1], +m[2], +m[3]]; if (g > 110 && g > r + 40 && g > b2 + 20) return 'green'; if (r > 150 && r > g + 60) return 'red'; if (r > 180 && g > 120 && b2 < 90) return 'red'; } } return ''; };
+      const lights = [];
+      for (const nm of NAMES) {
+        const cand = [...head.querySelectorAll('li, span, div, a, p, button')].filter(e => vis(e) && norm(e.innerText) === norm(nm) || (e.classList && e.classList.contains('confirm-market-scope') && nm === 'Market Scope'));
+        const el = cand.sort((x, y) => x.innerText.length - y.innerText.length)[0];
+        if (!el) continue;
+        let node = el, state = '', why = '';
+        for (let up = 0; up < 3 && node && !state; up++, node = node.parentElement) {
+          const cls = [node, ...node.querySelectorAll('*')].slice(0, 15).map(e => (typeof e.className === 'string' ? e.className : (e.getAttribute && e.getAttribute('class')) || '') + ' ' + (e.getAttribute && (e.getAttribute('title') || e.getAttribute('aria-label') || e.getAttribute('data-status')) || '')).join(' ');
+          if (RED.test(cls)) { state = 'red'; why = (cls.match(RED) || [])[0]; } else if (GREEN.test(cls)) { state = 'green'; why = (cls.match(GREEN) || [])[0]; }
+          if (!state && up === 0) { const c = colorOf(node); if (c) { state = c; why = 'couleur'; } }
+        }
+        if (nm === 'Market Scope') { const sc = document.querySelector('button.confirm-market-scope'); if (sc) { state = /confirmed/i.test(sc.innerText) ? 'green' : 'red'; why = sc.innerText.trim(); } }
+        lights.push({ name: nm, state: state || '?', why: String(why || '').trim() });
+      }
+      const pub = document.querySelector('button.publish-release, button.publish-resource');
+      const st = document.querySelector('.rws-status');
+      const stCls = st ? st.className : '';
+      const published = /(^|\s)(Published|Live|Delivered)(\s|$)/.test(stCls) && !/Unpublished/.test(stCls);
+      const allGreen = lights.length >= 4 && lights.every(l => l.state === 'green');
+      const box = [...document.querySelectorAll('div.milestones-and-publish')].map(x => x.outerHTML).join('\n').slice(0, 6000);
+      const info = { lights, allGreen, published, status: stCls.replace('rws-status', '').trim(), canPublish: !!pub && !pub.classList.contains('disabled') && !pub.disabled, key: (location.pathname.match(/(releases|resources)\/([A-Z0-9]+)/i) || [])[2] || '', kind: /resources\//.test(location.pathname) ? 'resource' : 'release', title: document.title, html: box };
+      if (step === 'lights') return { ok: true, info, log };
+      // publish : seulement si tout est vert (re-vérifié ici, au moment du clic)
+      if (published) { say('Déjà publiée.'); return { ok: true, skipped: true, info, log }; }
+      if (!allGreen && !opts.force) throw new Error('tous les voyants ne sont pas verts : publication annulée');
+      if (!pub || !info.canPublish) throw new Error('bouton Publish indisponible');
+      click(pub);
+      await sleep(1500);
+      // fenêtre de confirmation éventuelle
+      const conf = await until(() => [...document.querySelectorAll('.overlay button, .modal button, [role=dialog] button, .overlay-footer button')].find(b => vis(b) && /^(publish( release| resource)?|confirm|yes|ok|continue|oui)$/i.test(b.innerText.trim())), 4000);
+      if (conf) { say('Confirmation : ' + conf.innerText.trim()); click(conf); }
+      const okPub = await until(() => { const s2 = document.querySelector('.rws-status'); return s2 && !/Unpublished/.test(s2.className) ? s2 : null; }, 30000);
+      say(okPub ? 'Publish cliqué : statut ' + okPub.className.replace('rws-status', '').trim() : 'Publish cliqué (statut pas encore mis à jour)');
+      return { ok: true, info, published: !!okPub, log };
+    }
+
     if (step === 'scope') {
       const b = document.querySelector('button.confirm-market-scope');
       if (!b) throw new Error('bouton « Confirm Market Scope » introuvable');
